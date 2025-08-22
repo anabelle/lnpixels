@@ -61,24 +61,6 @@ const PurchasePanel: React.FC<PurchasePanelProps> = ({ collapsed, onToggle }) =>
             >
               Color + Letter ({getPriceForType('letter')})
             </button>
-            <button
-              className={`type-button ${state.type === 'color' ? 'active' : ''}`}
-              role="radio"
-              aria-checked={state.type === 'color'}
-              aria-label="Color pixel for 10 satoshis"
-              onClick={() => setPixelType('color')}
-            >
-              Color ({getDisplayPrice()})
-            </button>
-            <button
-              className={`type-button ${state.type === 'letter' ? 'active' : ''}`}
-              role="radio"
-              aria-checked={state.type === 'letter'}
-              aria-label="Color plus letter pixel for 100 satoshis"
-              onClick={() => setPixelType('letter')}
-            >
-              Color + Letter ({getDisplayPrice()})
-            </button>
           </div>
         </div>
 
