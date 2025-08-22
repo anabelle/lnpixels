@@ -6,6 +6,6 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
-    allowedHosts: ['vm-522.lnvps.cloud', 'localhost']
+    allowedHosts: ['vm-522.lnvps.cloud', 'localhost', 'lnpixels.heyanabelle.com']
   }
 });
