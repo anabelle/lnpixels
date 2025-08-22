@@ -202,12 +202,7 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   }, [viewport, dimensions, pixels, selectedPixel]);
 
-  // Ensure zoom is always fixed to pixel size
-  useEffect(() => {
-    if (viewport.zoom !== PIXEL_SIZE) {
-      setViewport(prev => ({ ...prev, zoom: PIXEL_SIZE }));
-    }
-  }, [viewport.zoom]);
+  // Zoom is now user-controllable - no longer forced to fixed size
 
   // Re-render when dependencies change
   useEffect(() => {
