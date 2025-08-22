@@ -20,7 +20,7 @@ export const useViewportWithUrl = () => {
     return {
       x: viewport.x,
       y: viewport.y,
-      z: Math.round(viewport.zoom / 20), // Convert pixel zoom to URL zoom (1-10)
+      z: viewport.zoom / 20, // Convert pixel zoom to URL zoom (1-10) - allow smooth transitions
     };
   }, []);
 
@@ -28,42 +28,58 @@ export const useViewportWithUrl = () => {
 
   // Sync viewport changes back to URL
   const handlePan = useCallback((deltaX: number, deltaY: number) => {
-    pan(deltaX, deltaY);
-    const newUrlState = viewportToUrl({
-      ...viewport,
-      x: viewport.x - deltaX / viewport.zoom,
-      y: viewport.y - deltaY / viewport.zoom,
-    });
-    updateUrlState(newUrlState);
+    try {
+      pan(deltaX, deltaY);
+      const newUrlState = viewportToUrl({
+        ...viewport,
+        x: viewport.x - deltaX / viewport.zoom,
+        y: viewport.y - deltaY / viewport.zoom,
+      });
+      updateUrlState(newUrlState);
+    } catch (error) {
+      console.error('Error during pan operation:', error);
+    }
   }, [pan, viewport, viewportToUrl, updateUrlState]);
 
   const handleZoom = useCallback((zoomFactor: number) => {
-    zoom(zoomFactor);
-    const newZoom = Math.max(5, Math.min(100, viewport.zoom * zoomFactor));
-    const newUrlState = viewportToUrl({
-      ...viewport,
-      zoom: newZoom,
-    });
-    updateUrlState(newUrlState);
+    try {
+      zoom(zoomFactor);
+      const newZoom = Math.max(5, Math.min(100, viewport.zoom * zoomFactor));
+      const newUrlState = viewportToUrl({
+        ...viewport,
+        zoom: newZoom,
+      });
+      updateUrlState(newUrlState);
+    } catch (error) {
+      console.error('Error during zoom operation:', error);
+    }
   }, [zoom, viewport, viewportToUrl, updateUrlState]);
 
   const handleSetZoom = useCallback((newZoom: number) => {
-    setZoom(newZoom);
-    const newUrlState = viewportToUrl({
-      ...viewport,
-      zoom: newZoom,
-    });
-    updateUrlState(newUrlState);
+    try {
+      setZoom(newZoom);
+      const newUrlState = viewportToUrl({
+        ...viewport,
+        zoom: newZoom,
+      });
+      updateUrlState(newUrlState);
+    } catch (error) {
+      console.error('Error during setZoom operation:', error);
+    }
   }, [setZoom, viewport, viewportToUrl, updateUrlState]);
 
   const handleCenterOn = useCallback((x: number, y: number) => {
-    centerOn(x, y);
-    const newUrlState = viewportToUrl({
-      ...viewport,
-      x,
-      y,
-    });
-    updateUrlState(newUrlState);
+    try {
+      centerOn(x, y);
+      const newUrlState = viewportToUrl({
+        ...viewport,
+        x,
+        y,
+      });
+      updateUrlState(newUrlState);
+    } catch (error) {
+      console.error('Error during centerOn operation:', error);
+    }
   }, [centerOn, viewport, viewportToUrl, updateUrlState]);
 
   return {

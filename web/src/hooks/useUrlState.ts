@@ -23,7 +23,7 @@ export const useUrlState = () => {
     const parseNumber = (value: string | null, defaultValue: number): number => {
       if (!value) return defaultValue;
       const parsed = parseFloat(value);
-      return isNaN(parsed) ? defaultValue : Math.round(parsed);
+      return isNaN(parsed) ? defaultValue : parsed;
     };
 
     const x = parseNumber(params.get('x'), 0);
@@ -39,11 +39,11 @@ export const useUrlState = () => {
   const updateUrlState = useCallback((newState: Partial<UrlState>) => {
     const currentState = { ...urlState, ...newState };
 
-    // Round coordinates to integers
+    // Round coordinates to integers, keep zoom as float for smooth transitions
     const roundedState = {
       x: Math.round(currentState.x),
       y: Math.round(currentState.y),
-      z: Math.round(currentState.z),
+      z: currentState.z, // Don't round zoom to allow smooth transitions
     };
 
     // Only update if something actually changed

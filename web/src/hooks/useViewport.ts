@@ -36,7 +36,9 @@ export const useViewport = (initialZoomOrState?: number | Partial<Viewport>) => 
   }, []);
 
   const zoom = useCallback((zoomFactor: number) => {
-    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom * zoomFactor));
+    // Prevent extreme zoom factors that could cause crashes
+    const safeZoomFactor = Math.max(0.1, Math.min(10, zoomFactor));
+    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom * safeZoomFactor));
     setViewport(prev => ({
       ...prev,
       zoom: newZoom,
@@ -44,6 +46,11 @@ export const useViewport = (initialZoomOrState?: number | Partial<Viewport>) => 
   }, [viewport.zoom]);
 
   const setZoom = useCallback((newZoom: number) => {
+    // Validate input to prevent crashes
+    if (!isFinite(newZoom) || isNaN(newZoom)) {
+      console.warn('Invalid zoom value:', newZoom);
+      return;
+    }
     const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
     setViewport(prev => ({
       ...prev,
