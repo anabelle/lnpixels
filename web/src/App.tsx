@@ -41,7 +41,15 @@ const CanvasComponent = ({
   selectedPixel: { x: number; y: number } | null;
   onPixelSelect: (x: number, y: number) => void;
 }) => (
-  <main className="canvas-container" role="main" aria-label="Pixel canvas">
+  <main
+    className="canvas-container"
+    role="main"
+    aria-label="Pixel canvas"
+    onWheel={(e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    }}
+  >
     <Canvas
       pixels={pixels}
       onPixelSelect={onPixelSelect}
