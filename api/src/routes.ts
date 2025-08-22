@@ -130,14 +130,19 @@ export function setupRoutes(io: SocketServer) {
         return res.status(400).json({ error: 'Invalid rectangle coordinates' });
       }
 
-      const width = Math.abs(x2 - x1) + 1;
-      const height = Math.abs(y2 - y1) + 1;
-      const totalPixels = width * height;
+       const width = Math.abs(x2 - x1) + 1;
+       const height = Math.abs(y2 - y1) + 1;
+       const totalPixels = width * height;
 
-      // Validate letters length
-      if (letters && letters.length > totalPixels) {
-        return res.status(400).json({ error: 'Too many letters for rectangle size' });
-      }
+       // Validate max rectangle size (1000 pixels per design.md)
+       if (totalPixels > 1000) {
+         return res.status(413).json({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'Rectangle size exceeds maximum of 1000 pixels' } });
+       }
+
+       // Validate letters length
+       if (letters && letters.length > totalPixels) {
+         return res.status(400).json({ error: 'Too many letters for rectangle size' });
+       }
 
       // Calculate total price
       let totalPrice = 0;

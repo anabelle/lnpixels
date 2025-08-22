@@ -34,6 +34,7 @@ const Canvas: React.FC<ExtendedCanvasProps> = ({
   );
   const [lastSelectedPixel, setLastSelectedPixel] = useState<{ x: number; y: number } | null>(null);
   const [selectedRectangle, setSelectedRectangle] = useState<Rectangle | null>(null);
+  const [rectangleError, setRectangleError] = useState<string | null>(null);
 
   // Use the new selection state hook
   const { selectionState, selectSinglePixel, selectRectangle, clearSelection } = useSelectionState();
@@ -62,17 +63,52 @@ const Canvas: React.FC<ExtendedCanvasProps> = ({
         newSelectionState = updateRectangleSelection(newSelectionState, x, y, true);
         setRectangleSelection(newSelectionState);
 
-        // Complete the rectangle selection immediately
+        // Calculate the rectangle bounds first for validation
+        const tempRect = {
+          x1: Math.min(lastSelectedPixel.x, x),
+          y1: Math.min(lastSelectedPixel.y, y),
+          x2: Math.max(lastSelectedPixel.x, x),
+          y2: Math.max(lastSelectedPixel.y, y)
+        };
+
+        // Calculate selected pixels for validation
+        const selectedPixels = getSelectedPixelsInRectangle(tempRect);
+        const pixelCount = selectedPixels.length;
+
+        // Validate rectangle size (max 1000 pixels per design.md)
+        if (pixelCount > 1000) {
+          const errorMessage = `Rectangle too large: ${pixelCount} pixels selected (maximum 1000 pixels allowed)`;
+          console.warn(errorMessage);
+          setRectangleError(errorMessage);
+
+          // Clear any existing rectangle selection state
+          setRectangleSelection(createRectangleSelection());
+          setSelectedRectangle(null);
+
+          // Show user feedback
+          alert(`Selection too large!\n\nYou selected ${pixelCount} pixels, but the maximum allowed is 1000 pixels.\n\nPlease select a smaller rectangle.`);
+
+          // Clear error after 5 seconds
+          setTimeout(() => setRectangleError(null), 5000);
+
+          return;
+        }
+
+        // Complete the rectangle selection only if validation passes
         const completed = completeRectangleSelection(newSelectionState);
         if (completed) {
+          // Clear any previous error
+          setRectangleError(null);
+
           // Store the selected rectangle for visual feedback
           setSelectedRectangle(completed.rectangle);
 
-          // Calculate selected pixels for the rectangle
-          const selectedPixels = getSelectedPixelsInRectangle(completed.rectangle);
-
           // Update selection state with rectangle
           selectRectangle(completed.rectangle);
+
+          // Keep lastSelectedPixel as the origin for future rectangle selections
+          // Don't update it to the end point - this allows users to create multiple
+          // rectangles from the same origin point
 
           // Notify parent component of selection change with correct data
           if (onSelectionChange) {
@@ -98,8 +134,9 @@ const Canvas: React.FC<ExtendedCanvasProps> = ({
         setRectangleSelection(cancelRectangleSelection(rectangleSelection));
       }
 
-      // Clear selected rectangle when doing single pixel selection
+      // Clear selected rectangle and any errors when doing single pixel selection
       setSelectedRectangle(null);
+      setRectangleError(null);
 
       // Handle single pixel selection
       selectSinglePixel(x, y);
@@ -404,6 +441,31 @@ const Canvas: React.FC<ExtendedCanvasProps> = ({
             zIndex: 10,
           }}
         />
+      )}
+
+      {/* Rectangle selection error message */}
+      {rectangleError && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'rgba(239, 68, 68, 0.9)',
+            color: 'white',
+            padding: '12px 20px',
+            borderRadius: '8px',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            textAlign: 'center',
+            maxWidth: '400px',
+            zIndex: 1000,
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            border: '2px solid #dc2626',
+          }}
+        >
+          {rectangleError}
+        </div>
       )}
     </>
   );
