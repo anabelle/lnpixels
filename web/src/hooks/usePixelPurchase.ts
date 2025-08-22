@@ -60,6 +60,10 @@ export const usePixelPurchase = () => {
     return `${state.price} sat${state.price !== 1 ? 's' : ''}`;
   }, [state.price]);
 
+  const getPriceForType = useCallback((type: PixelType) => {
+    return `${PRICING[type]} sat${PRICING[type] !== 1 ? 's' : ''}`;
+  }, []);
+
   return {
     state,
     setPixelType,
@@ -67,5 +71,6 @@ export const usePixelPurchase = () => {
     setLetter,
     isValid,
     getDisplayPrice,
+    getPriceForType,
   };
 };

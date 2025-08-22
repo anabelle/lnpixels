@@ -8,7 +8,7 @@ interface PurchasePanelProps {
 }
 
 const PurchasePanel: React.FC<PurchasePanelProps> = ({ collapsed, onToggle }) => {
-  const { state, setPixelType, setColor, setLetter, isValid, getDisplayPrice } = usePixelPurchase();
+  const { state, setPixelType, setColor, setLetter, isValid, getDisplayPrice, getPriceForType } = usePixelPurchase();
 
   return (
     <aside
@@ -41,7 +41,25 @@ const PurchasePanel: React.FC<PurchasePanelProps> = ({ collapsed, onToggle }) =>
               aria-label="Basic pixel for 1 satoshi"
               onClick={() => setPixelType('basic')}
             >
-              Basic ({getDisplayPrice()})
+              Basic ({getPriceForType('basic')})
+            </button>
+            <button
+              className={`type-button ${state.type === 'color' ? 'active' : ''}`}
+              role="radio"
+              aria-checked={state.type === 'color'}
+              aria-label="Color pixel for 10 satoshis"
+              onClick={() => setPixelType('color')}
+            >
+              Color ({getPriceForType('color')})
+            </button>
+            <button
+              className={`type-button ${state.type === 'letter' ? 'active' : ''}`}
+              role="radio"
+              aria-checked={state.type === 'letter'}
+              aria-label="Color plus letter pixel for 100 satoshis"
+              onClick={() => setPixelType('letter')}
+            >
+              Color + Letter ({getPriceForType('letter')})
             </button>
             <button
               className={`type-button ${state.type === 'color' ? 'active' : ''}`}
