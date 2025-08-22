@@ -10,31 +10,26 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 10;
 
 export const useUrlState = () => {
+  // Parse URL parameters synchronously on initialization
+  const parseNumber = (value: string | null, defaultValue: number): number => {
+    if (!value) return defaultValue;
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? defaultValue : parsed;
+  };
+
+  const params = new URLSearchParams(window.location.search);
+  const x = parseNumber(params.get('x'), 0);
+  const y = parseNumber(params.get('y'), 0);
+  let z = parseNumber(params.get('z'), 1);
+
+  // Clamp zoom to valid range
+  z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+
   const [urlState, setUrlState] = useState<UrlState>({
-    x: 0,
-    y: 0,
-    z: 1,
+    x,
+    y,
+    z,
   });
-
-  // Parse URL parameters on mount
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-
-    const parseNumber = (value: string | null, defaultValue: number): number => {
-      if (!value) return defaultValue;
-      const parsed = parseFloat(value);
-      return isNaN(parsed) ? defaultValue : parsed;
-    };
-
-    const x = parseNumber(params.get('x'), 0);
-    const y = parseNumber(params.get('y'), 0);
-    let z = parseNumber(params.get('z'), 1);
-
-    // Clamp zoom to valid range
-    z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
-
-    setUrlState({ x, y, z });
-  }, []);
 
   const updateUrlState = useCallback((newState: Partial<UrlState>) => {
     const currentState = { ...urlState, ...newState };
