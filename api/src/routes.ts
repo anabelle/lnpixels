@@ -2,129 +2,30 @@ import { Router } from 'express';
 import { Server as SocketServer } from 'socket.io';
 import { PaymentsAdapter, NakaPayAdapter, MockPaymentsAdapter } from './payments.js';
 import { price } from './pricing.js';
-import * as fs from 'fs';
-import * as path from 'path';
 
 // Track processed payment IDs for idempotency
 const processedPayments = new Set<string>();
 
-// Persistence configuration
-const PIXELS_DATA_FILE = path.join(process.cwd(), 'data', 'pixels.json');
-const PROCESSED_PAYMENTS_FILE = path.join(process.cwd(), 'data', 'processed_payments.json');
-
-// Ensure data directory exists
-if (!fs.existsSync(path.dirname(PIXELS_DATA_FILE))) {
-  fs.mkdirSync(path.dirname(PIXELS_DATA_FILE), { recursive: true });
-}
-
-// Load pixels from file
-function loadPixels(): any[] {
-  try {
-    if (fs.existsSync(PIXELS_DATA_FILE)) {
-      const data = fs.readFileSync(PIXELS_DATA_FILE, 'utf8');
-      const pixels = JSON.parse(data);
-      console.log(`Loaded ${pixels.length} pixels from ${PIXELS_DATA_FILE}`);
-      return pixels;
-    }
-  } catch (error) {
-    console.error('Error loading pixels from file:', error);
-  }
-  return [];
-}
-
-// Save pixels to file
-function savePixels(pixels: any[]): void {
-  try {
-    fs.writeFileSync(PIXELS_DATA_FILE, JSON.stringify(pixels, null, 2));
-    console.log(`Saved ${pixels.length} pixels to ${PIXELS_DATA_FILE}`);
-  } catch (error) {
-    console.error('Error saving pixels to file:', error);
-  }
-}
-
-// Load processed payments from file
-function loadProcessedPayments(): Set<string> {
-  try {
-    if (fs.existsSync(PROCESSED_PAYMENTS_FILE)) {
-      const data = fs.readFileSync(PROCESSED_PAYMENTS_FILE, 'utf8');
-      const payments = JSON.parse(data);
-      console.log(`Loaded ${payments.length} processed payments from ${PROCESSED_PAYMENTS_FILE}`);
-      return new Set(payments);
-    }
-  } catch (error) {
-    console.error('Error loading processed payments from file:', error);
-  }
-  return new Set();
-}
-
-// Save processed payments to file
-function saveProcessedPayments(payments: Set<string>): void {
-  try {
-    const paymentsArray = Array.from(payments);
-    fs.writeFileSync(PROCESSED_PAYMENTS_FILE, JSON.stringify(paymentsArray, null, 2));
-    console.log(`Saved ${paymentsArray.length} processed payments to ${PROCESSED_PAYMENTS_FILE}`);
-  } catch (error) {
-    console.error('Error saving processed payments to file:', error);
-  }
-}
-
 const router = Router();
 
-// Load persistent pixel data
-export let pixels: any[] = loadPixels();
-
-// If no pixels loaded (first run), initialize with default data
-if (pixels.length === 0) {
-  pixels = [
-    { x: 0, y: 0, color: '#ff0000', letter: 'H', sats: 100, created_at: Date.now() },
-    { x: 1, y: 0, color: '#00ff00', letter: 'E', sats: 10, created_at: Date.now() },
-    { x: 2, y: 0, color: '#0000ff', letter: 'L', sats: 1, created_at: Date.now() },
-    { x: 3, y: 0, color: '#ffff00', letter: 'L', sats: 100, created_at: Date.now() },
-    { x: 4, y: 0, color: '#ff00ff', letter: 'O', sats: 10, created_at: Date.now() },
-    { x: 0, y: 1, color: '#00ffff', sats: 1, created_at: Date.now() },
-    { x: 1, y: 1, color: '#ff8000', sats: 10, created_at: Date.now() },
-    { x: 2, y: 1, color: '#8000ff', sats: 100, created_at: Date.now() },
-    { x: 3, y: 1, color: '#0080ff', sats: 1, created_at: Date.now() },
-    { x: 4, y: 1, color: '#ff0080', sats: 10, created_at: Date.now() },
-    { x: -2, y: -1, color: '#00ff80', letter: 'W', sats: 100, created_at: Date.now() },
-    { x: -1, y: -1, color: '#80ff00', letter: 'O', sats: 10, created_at: Date.now() },
-    { x: 0, y: -1, color: '#ff0080', letter: 'R', sats: 1, created_at: Date.now() },
-    { x: 1, y: -1, color: '#8000ff', letter: 'L', sats: 100, created_at: Date.now() },
-    { x: 2, y: -1, color: '#0080ff', letter: 'D', sats: 10, created_at: Date.now() },
-  ];
-  savePixels(pixels); // Save initial data
-}
-
-// Load processed payments
-const processedPayments = loadProcessedPayments();
-
-// Periodic save interval (save every 5 minutes)
-setInterval(() => {
-  console.log('Periodic save: saving pixel data and processed payments');
-  savePixels(pixels);
-  saveProcessedPayments(processedPayments);
-}, 5 * 60 * 1000); // 5 minutes
-
-// Save on process exit
-process.on('exit', () => {
-  console.log('Process exiting: saving data');
-  savePixels(pixels);
-  saveProcessedPayments(processedPayments);
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT received: saving data and exiting');
-  savePixels(pixels);
-  saveProcessedPayments(processedPayments);
-  process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received: saving data and exiting');
-  savePixels(pixels);
-  saveProcessedPayments(processedPayments);
-  process.exit(0);
-});
+// In-memory storage for pixels (will be replaced with database later)
+export let pixels: any[] = [
+  { x: 0, y: 0, color: '#ff0000', letter: 'H', sats: 100, created_at: Date.now() },
+  { x: 1, y: 0, color: '#00ff00', letter: 'E', sats: 10, created_at: Date.now() },
+  { x: 2, y: 0, color: '#0000ff', letter: 'L', sats: 1, created_at: Date.now() },
+  { x: 3, y: 0, color: '#ffff00', letter: 'L', sats: 100, created_at: Date.now() },
+  { x: 4, y: 0, color: '#ff00ff', letter: 'O', sats: 10, created_at: Date.now() },
+  { x: 0, y: 1, color: '#00ffff', sats: 1, created_at: Date.now() },
+  { x: 1, y: 1, color: '#ff8000', sats: 10, created_at: Date.now() },
+  { x: 2, y: 1, color: '#8000ff', sats: 100, created_at: Date.now() },
+  { x: 3, y: 1, color: '#0080ff', sats: 1, created_at: Date.now() },
+  { x: 4, y: 1, color: '#ff0080', sats: 10, created_at: Date.now() },
+  { x: -2, y: -1, color: '#00ff80', letter: 'W', sats: 100, created_at: Date.now() },
+  { x: -1, y: -1, color: '#80ff00', letter: 'O', sats: 10, created_at: Date.now() },
+  { x: 0, y: -1, color: '#ff0080', letter: 'R', sats: 1, created_at: Date.now() },
+  { x: 1, y: -1, color: '#8000ff', letter: 'L', sats: 100, created_at: Date.now() },
+  { x: 2, y: -1, color: '#0080ff', letter: 'D', sats: 10, created_at: Date.now() },
+];
 
 // Initialize payments adapter
 const paymentsAdapter: PaymentsAdapter = process.env.NAKAPAY_API_KEY
@@ -378,10 +279,6 @@ export function setupRoutes(io: SocketServer) {
 
         // Mark payment as processed for idempotency
         processedPayments.add(paymentId);
-        saveProcessedPayments(processedPayments);
-
-        // Save pixel changes to disk
-        savePixels(pixels);
       }
 
       res.json({ success: true });
