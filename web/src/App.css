@@ -179,6 +179,13 @@ body {
   transition: background-color 0.3s ease;
 }
 
+.pixel-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: var(--bg-secondary);
+}
+
 .canvas-placeholder {
   width: 100%;
   height: 100%;
@@ -212,23 +219,26 @@ body {
   right: 0;
   bottom: 0;
   pointer-events: none;
+  z-index: 10;
 }
 
 .selection-tool {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(255, 255, 255, 0.9);
-  padding: 1rem;
+  top: 20px;
+  left: 20px;
+  background: var(--bg-primary);
+  padding: 0.75rem 1rem;
   border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-primary);
   text-align: center;
+  pointer-events: auto;
 }
 
 .selection-info {
-  color: #64748b;
+  color: var(--text-primary);
   font-size: 0.9rem;
+  font-weight: 500;
 }
 
 /* Sidebar Panels */
