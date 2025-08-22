@@ -1,0 +1,9 @@
+{
+  "name": "lnpixels",
+  "version": "1.0.0",
+  "description": "LNPixels project",
+  "workspaces": ["api", "web"],
+  "scripts": {
+    "test": "npm run test -w api && npm run test -w web"
+  }
+}
