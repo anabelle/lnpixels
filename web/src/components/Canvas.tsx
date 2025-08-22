@@ -4,6 +4,14 @@ import { useViewportContext } from '../contexts/ViewportContext';
 import { useCanvasCoordinates } from '../hooks/useCanvasCoordinates';
 import { useCanvasEvents } from '../hooks/useCanvasEvents';
 import { validatePixelSelection } from '../lib/pixelValidation';
+import {
+  RectangleSelectionState,
+  createRectangleSelection,
+  updateRectangleSelection,
+  completeRectangleSelection,
+  cancelRectangleSelection,
+  Rectangle
+} from '../lib/rectangleSelection';
 
 const Canvas: React.FC<CanvasProps> = ({
   pixels = [],
@@ -14,24 +22,73 @@ const Canvas: React.FC<CanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [isLayoutChanging, setIsLayoutChanging] = useState(false);
+  const [rectangleSelection, setRectangleSelection] = useState<RectangleSelectionState>(
+    createRectangleSelection()
+  );
+  const [lastSelectedPixel, setLastSelectedPixel] = useState<{ x: number; y: number } | null>(null);
+  const [selectedRectangle, setSelectedRectangle] = useState<Rectangle | null>(null);
 
   // Use shared viewport context
   const { viewport, pan, zoom } = useViewportContext();
   const { screenToWorld, worldToScreen } = useCanvasCoordinates(canvasRef, viewport, dimensions);
 
-  // Custom pixel selection handler with validation
-  const handleValidatedPixelSelect = useCallback((x: number, y: number) => {
+  // Custom pixel selection handler with validation and rectangle selection
+  const handlePixelInteraction = useCallback((screenX: number, screenY: number, isShiftPressed: boolean) => {
+    const worldCoords = screenToWorld(screenX, screenY);
+    const x = Math.round(worldCoords.x);
+    const y = Math.round(worldCoords.y);
+
     const validation = validatePixelSelection(x, y, pixels);
 
-    if (validation.isValid) {
+    if (!validation.isValid) {
+      return; // Invalid coordinates, ignore
+    }
+
+    if (isShiftPressed) {
+      // Handle rectangle selection
+      if (lastSelectedPixel) {
+        // Start rectangle selection from last selected pixel
+        let newSelectionState = updateRectangleSelection(rectangleSelection, lastSelectedPixel.x, lastSelectedPixel.y, true);
+        newSelectionState = updateRectangleSelection(newSelectionState, x, y, true);
+        setRectangleSelection(newSelectionState);
+
+        // Complete the rectangle selection immediately
+        const completed = completeRectangleSelection(newSelectionState);
+        if (completed && onPixelSelect) {
+          // Store the selected rectangle for visual feedback
+          setSelectedRectangle(completed.rectangle);
+
+          // For now, just select the first pixel of the rectangle
+          // TODO: Implement bulk selection in purchase panel
+          onPixelSelect(completed.rectangle.x1, completed.rectangle.y1);
+          setRectangleSelection(createRectangleSelection());
+        }
+      } else {
+        console.log('No previous pixel selected for rectangle');
+        // No previous pixel selected, start from current position
+        const newSelectionState = updateRectangleSelection(rectangleSelection, x, y, true);
+        setRectangleSelection(newSelectionState);
+      }
+    } else {
+      // Cancel any active rectangle selection
+      if (rectangleSelection.isActive) {
+        setRectangleSelection(cancelRectangleSelection(rectangleSelection));
+      }
+
+      // Clear selected rectangle when doing single pixel selection
+      setSelectedRectangle(null);
+
+      // Handle single pixel selection
       if (onPixelSelect) {
         onPixelSelect(x, y);
       }
-    }
-    // Note: According to design doc, all valid pixel selections should proceed
-    // Invalid selections (non-integer coordinates) are handled by coordinate conversion
-  }, [pixels, onPixelSelect]);
 
+      // Store this as the last selected pixel for future rectangle selections
+      setLastSelectedPixel({ x, y });
+    }
+  }, [pixels, onPixelSelect, rectangleSelection, screenToWorld, lastSelectedPixel]);
+
+  // Use original canvas events for panning/zooming
   const {
     isPanning,
     isPinching,
@@ -48,8 +105,29 @@ const Canvas: React.FC<CanvasProps> = ({
     pan,
     zoom,
     screenToWorld,
-    onPixelSelect: handleValidatedPixelSelect,
+    onPixelSelect: (x, y) => {
+      // Handle single pixel selection through the original system
+      if (onPixelSelect) {
+        onPixelSelect(x, y);
+      }
+      // Store this as the last selected pixel for future rectangle selections
+      setLastSelectedPixel({ x, y });
+      // Clear any selected rectangle when selecting a single pixel
+      setSelectedRectangle(null);
+    },
   });
+
+  // Custom click handler that supports rectangle selection
+  const handleClickCustom = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (e.shiftKey) {
+      // Handle shift+click for rectangle selection
+      e.preventDefault();
+      handlePixelInteraction(e.clientX, e.clientY, true);
+    } else {
+      // Let the original click handler handle regular clicks
+      handleClick(e);
+    }
+  }, [handlePixelInteraction, handleClick]);
 
 
 
@@ -97,6 +175,12 @@ const Canvas: React.FC<CanvasProps> = ({
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    // Ensure canvas is properly sized
+    if (canvas.width !== dimensions.width || canvas.height !== dimensions.height) {
+      canvas.width = dimensions.width;
+      canvas.height = dimensions.height;
+    }
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -149,8 +233,34 @@ const Canvas: React.FC<CanvasProps> = ({
       }
     });
 
-    // Draw selected pixel highlight
-    if (selectedPixel) {
+    // Draw selection highlight - prioritize rectangle over single pixel
+    if (selectedRectangle) {
+      // Draw selected rectangle highlight with same style as selected pixel
+      const rect = selectedRectangle;
+
+      // Convert world coordinates to screen coordinates
+      const screenX1 = (rect.x1 - viewport.x) * viewport.zoom + dimensions.width / 2;
+      const screenY1 = (rect.y1 - viewport.y) * viewport.zoom + dimensions.height / 2;
+      const screenX2 = (rect.x2 - viewport.x) * viewport.zoom + dimensions.width / 2;
+      const screenY2 = (rect.y2 - viewport.y) * viewport.zoom + dimensions.height / 2;
+
+      const width = screenX2 - screenX1;
+      const height = screenY2 - screenY1;
+
+      // Ensure we have valid dimensions before drawing
+      if (width > 0 && height > 0) {
+        // Draw white border (outer) - same as selected pixel
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2 / viewport.zoom;
+        ctx.strokeRect(screenX1, screenY1, width, height);
+
+        // Draw black border (inner) - same as selected pixel
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1 / viewport.zoom;
+        ctx.strokeRect(screenX1, screenY1, width, height);
+      }
+    } else if (selectedPixel) {
+      // Draw selected pixel highlight only if no rectangle is selected
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2 / viewport.zoom;
       ctx.strokeRect(selectedPixel.x, selectedPixel.y, 1, 1);
@@ -170,7 +280,10 @@ const Canvas: React.FC<CanvasProps> = ({
       ctx.font = '10px Arial';
       ctx.fillText('Resizing...', 15, 58);
     }
-  }, [viewport, dimensions, pixels, selectedPixel]);
+
+    // Note: Rectangle selection is now immediate, so no visual feedback needed
+    // The selection completes instantly on shift+click
+  }, [viewport, dimensions, pixels, selectedPixel, selectedRectangle, screenToWorld]);
 
   // Zoom is now user-controllable - no longer forced to fixed size
 
@@ -179,6 +292,22 @@ const Canvas: React.FC<CanvasProps> = ({
     render();
   }, [render]);
 
+  // Force re-render when selectedRectangle changes
+  useEffect(() => {
+    if (selectedRectangle) {
+      // Use requestAnimationFrame to ensure proper timing
+      requestAnimationFrame(() => {
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            render();
+          }
+        }
+      });
+    }
+  }, [selectedRectangle, render]);
+
 
 
 
@@ -186,26 +315,47 @@ const Canvas: React.FC<CanvasProps> = ({
 
 
   return (
-    <canvas
-      ref={canvasRef}
-      className={`pixel-canvas ${className}`}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onClick={handleClick}
-      onWheel={handleWheel}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onContextMenu={(e) => e.preventDefault()}
-      role="img"
-      aria-label="Pixel canvas"
-      style={{
-        cursor: isPanning ? 'grabbing' : 'grab',
-        touchAction: 'none',
-      }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        className={`pixel-canvas ${className}`}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onClick={handleClickCustom}
+        onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onContextMenu={(e) => e.preventDefault()}
+        role="img"
+        aria-label="Pixel canvas"
+        style={{
+          cursor: isPanning ? 'grabbing' : 'grab',
+          touchAction: 'none',
+          position: 'relative',
+          zIndex: 1,
+        }}
+      />
+
+      {/* Visual overlay for rectangle selection as fallback */}
+      {selectedRectangle && (
+        <div
+          style={{
+            position: 'absolute',
+            left: `${((selectedRectangle.x1 - viewport.x) * viewport.zoom + dimensions.width / 2)}px`,
+            top: `${((selectedRectangle.y1 - viewport.y) * viewport.zoom + dimensions.height / 2)}px`,
+            width: `${(selectedRectangle.x2 - selectedRectangle.x1 + 1) * viewport.zoom}px`,
+            height: `${(selectedRectangle.y2 - selectedRectangle.y1 + 1) * viewport.zoom}px`,
+            border: '2px solid white',
+            outline: '1px solid black',
+            pointerEvents: 'none',
+            zIndex: 10,
+          }}
+        />
+      )}
+    </>
   );
 };
 
