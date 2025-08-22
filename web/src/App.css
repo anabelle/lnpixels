@@ -154,7 +154,7 @@ body {
   min-height: calc(100vh - 60px);
   max-height: calc(100vh - 60px);
   overflow: hidden;
-  transition: grid-template-columns 0.3s ease;
+  transition: grid-template-columns 0.2s ease; /* Faster transition for better UX */
 }
 
 /* Collapsed states */
@@ -204,6 +204,8 @@ body {
   image-rendering: pixelated; /* Maintain pixel crispness */
   image-rendering: -moz-crisp-edges;
   image-rendering: crisp-edges;
+  object-fit: contain; /* Maintain aspect ratio */
+  transition: width 0.2s ease, height 0.2s ease; /* Smooth resize transitions */
 }
 
 .canvas-placeholder {

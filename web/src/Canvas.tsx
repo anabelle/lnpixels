@@ -38,12 +38,15 @@ const Canvas: React.FC<CanvasProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [isLayoutChanging, setIsLayoutChanging] = useState(false);
 
   // No zoom limits needed - pixel size is fixed
 
-  // Handle canvas resize with stable pixel size
+  // Handle canvas resize with stable view preservation
   useEffect(() => {
     let resizeTimeout: NodeJS.Timeout;
+    let lastResizeTime = 0;
+    let lastWidth = dimensions.width;
 
     const updateDimensions = () => {
       if (canvasRef.current) {
@@ -51,25 +54,65 @@ const Canvas: React.FC<CanvasProps> = ({
         const newDimensions = { width: rect.width, height: rect.height };
 
         // Only update if dimensions actually changed significantly
-        if (Math.abs(newDimensions.width - dimensions.width) > 10 ||
-            Math.abs(newDimensions.height - dimensions.height) > 10) {
-          setDimensions(newDimensions);
-          canvasRef.current.width = rect.width;
-          canvasRef.current.height = rect.height;
+        if (Math.abs(newDimensions.width - dimensions.width) > 5 ||
+            Math.abs(newDimensions.height - dimensions.height) > 5) {
+
+          const now = Date.now();
+          const timeSinceLastResize = now - lastResizeTime;
+          const widthChange = Math.abs(newDimensions.width - lastWidth);
+
+          // Detect sidebar toggles: rapid width changes of specific sizes
+          const isLikelySidebarToggle = timeSinceLastResize < 300 &&
+                                      widthChange > 50 &&
+                                      widthChange < 400;
+
+          lastResizeTime = now;
+          lastWidth = newDimensions.width;
+
+          if (isLikelySidebarToggle) {
+            // Sidebar toggle: just update canvas size, maintain view
+            canvasRef.current.width = rect.width;
+            canvasRef.current.height = rect.height;
+            setDimensions(newDimensions);
+            setIsLayoutChanging(true);
+
+            // Reset layout changing flag after animation
+            setTimeout(() => setIsLayoutChanging(false), 300);
+          } else {
+            // Normal resize: update dimensions and viewport
+            setDimensions(newDimensions);
+            canvasRef.current.width = rect.width;
+            canvasRef.current.height = rect.height;
+          }
         }
       }
     };
 
     const debouncedUpdate = () => {
       clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(updateDimensions, 100);
+      resizeTimeout = setTimeout(updateDimensions, 16); // ~60fps for smooth updates
     };
 
     updateDimensions();
     window.addEventListener('resize', debouncedUpdate);
+
+    // Listen for layout changes on the canvas container
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.target === canvasRef.current?.parentElement) {
+          debouncedUpdate();
+        }
+      }
+    });
+
+    if (canvasRef.current?.parentElement) {
+      resizeObserver.observe(canvasRef.current.parentElement);
+    }
+
     return () => {
       clearTimeout(resizeTimeout);
       window.removeEventListener('resize', debouncedUpdate);
+      resizeObserver.disconnect();
     };
   }, [dimensions]);
 
@@ -172,6 +215,15 @@ const Canvas: React.FC<CanvasProps> = ({
     ctx.font = '12px Arial';
     ctx.fillText(`X: ${Math.floor(viewport.x)}, Y: ${Math.floor(viewport.y)}`, 15, 25);
     ctx.fillText(`Pixel Size: ${PIXEL_SIZE}px`, 15, 40);
+
+    // Show layout changing indicator
+    if (isLayoutChanging) {
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.8)';
+      ctx.fillRect(10, 45, 80, 20);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '10px Arial';
+      ctx.fillText('Resizing...', 15, 58);
+    }
   }, [viewport, dimensions, pixels, selectedPixel]);
 
   // Ensure zoom is always fixed to pixel size
