@@ -147,14 +147,6 @@ const Canvas: React.FC<CanvasProps> = ({
 
     ctx.restore();
 
-    // Draw coordinates in corner
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(10, 10, 120, 40);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '12px Arial';
-    ctx.fillText(`X: ${Math.floor(viewport.x)}, Y: ${Math.floor(viewport.y)}`, 15, 25);
-    ctx.fillText(`Zoom: ${viewport.zoom.toFixed(1)}x`, 15, 40);
-
     // Show layout changing indicator
     if (isLayoutChanging) {
       ctx.fillStyle = 'rgba(59, 130, 246, 0.8)';

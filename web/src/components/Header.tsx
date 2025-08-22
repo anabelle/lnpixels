@@ -1,8 +1,30 @@
 import React from 'react';
 import { useTheme } from '../theme';
 
-const Header = () => {
+interface HeaderProps {
+  viewport?: {
+    x: number;
+    y: number;
+    zoom: number;
+  };
+}
+
+const Header: React.FC<HeaderProps> = ({ viewport }) => {
   const { actualTheme, toggleTheme } = useTheme();
+
+  // Format coordinates and zoom for display
+  const formatCoordinates = (x: number, y: number): string => {
+    return `${Math.round(x)}, ${Math.round(y)}`;
+  };
+
+  const formatZoom = (zoom: number): string => {
+    return `${Math.round(zoom * 100)}%`;
+  };
+
+  // Use actual viewport values or defaults
+  const displayX = viewport?.x ?? 0;
+  const displayY = viewport?.y ?? 0;
+  const displayZoom = viewport?.zoom ?? 1;
 
   return (
     <header className="header" role="banner">
@@ -14,8 +36,12 @@ const Header = () => {
           <button className="nav-button" aria-label="Get help">Help</button>
         </nav>
         <div className="header-controls" aria-label="Canvas information and controls">
-          <span className="coordinates" aria-label="Current coordinates">0, 0</span>
-          <span className="zoom" aria-label="Current zoom level">100%</span>
+          <span className="coordinates" aria-label="Current coordinates">
+            {formatCoordinates(displayX, displayY)}
+          </span>
+          <span className="zoom" aria-label="Current zoom level">
+            {formatZoom(displayZoom)}
+          </span>
           <button
             className="theme-toggle"
             onClick={toggleTheme}
