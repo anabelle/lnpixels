@@ -3,6 +3,7 @@ import { Pixel, CanvasProps } from '../types/canvas';
 import { useViewportContext } from '../contexts/ViewportContext';
 import { useCanvasCoordinates } from '../hooks/useCanvasCoordinates';
 import { useCanvasEvents } from '../hooks/useCanvasEvents';
+import { validatePixelSelection } from '../lib/pixelValidation';
 
 const Canvas: React.FC<CanvasProps> = ({
   pixels = [],
@@ -17,6 +18,20 @@ const Canvas: React.FC<CanvasProps> = ({
   // Use shared viewport context
   const { viewport, pan, zoom } = useViewportContext();
   const { screenToWorld, worldToScreen } = useCanvasCoordinates(canvasRef, viewport, dimensions);
+
+  // Custom pixel selection handler with validation
+  const handleValidatedPixelSelect = useCallback((x: number, y: number) => {
+    const validation = validatePixelSelection(x, y, pixels);
+
+    if (validation.isValid) {
+      if (onPixelSelect) {
+        onPixelSelect(x, y);
+      }
+    }
+    // Note: According to design doc, all valid pixel selections should proceed
+    // Invalid selections (non-integer coordinates) are handled by coordinate conversion
+  }, [pixels, onPixelSelect]);
+
   const {
     isPanning,
     isPinching,
@@ -33,7 +48,7 @@ const Canvas: React.FC<CanvasProps> = ({
     pan,
     zoom,
     screenToWorld,
-    onPixelSelect,
+    onPixelSelect: handleValidatedPixelSelect,
   });
 
 
