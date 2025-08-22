@@ -3,6 +3,7 @@ export interface Pixel {
   y: number;
   color: string;
   letter?: string;
+  sats: number; // Last purchase price in satoshis
 }
 
 export interface Viewport {

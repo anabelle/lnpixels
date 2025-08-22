@@ -3,6 +3,7 @@ import { Pixel, CanvasProps } from '../types/canvas';
 import { useViewportContext } from '../contexts/ViewportContext';
 import { useCanvasCoordinates } from '../hooks/useCanvasCoordinates';
 import { useCanvasEvents } from '../hooks/useCanvasEvents';
+import { useSelectionState } from '../hooks/useSelectionState';
 import { validatePixelSelection } from '../lib/pixelValidation';
 import {
   RectangleSelectionState,
@@ -10,13 +11,19 @@ import {
   updateRectangleSelection,
   completeRectangleSelection,
   cancelRectangleSelection,
-  Rectangle
+  Rectangle,
+  getSelectedPixelsInRectangle
 } from '../lib/rectangleSelection';
 
-const Canvas: React.FC<CanvasProps> = ({
+interface ExtendedCanvasProps extends CanvasProps {
+  onSelectionChange?: (selectionState: any) => void;
+}
+
+const Canvas: React.FC<ExtendedCanvasProps> = ({
   pixels = [],
   onPixelSelect,
   selectedPixel,
+  onSelectionChange,
   className = ''
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -27,6 +34,9 @@ const Canvas: React.FC<CanvasProps> = ({
   );
   const [lastSelectedPixel, setLastSelectedPixel] = useState<{ x: number; y: number } | null>(null);
   const [selectedRectangle, setSelectedRectangle] = useState<Rectangle | null>(null);
+
+  // Use the new selection state hook
+  const { selectionState, selectSinglePixel, selectRectangle, clearSelection } = useSelectionState();
 
   // Use shared viewport context
   const { viewport, pan, zoom } = useViewportContext();
@@ -54,13 +64,26 @@ const Canvas: React.FC<CanvasProps> = ({
 
         // Complete the rectangle selection immediately
         const completed = completeRectangleSelection(newSelectionState);
-        if (completed && onPixelSelect) {
+        if (completed) {
           // Store the selected rectangle for visual feedback
           setSelectedRectangle(completed.rectangle);
 
-          // For now, just select the first pixel of the rectangle
-          // TODO: Implement bulk selection in purchase panel
-          onPixelSelect(completed.rectangle.x1, completed.rectangle.y1);
+          // Calculate selected pixels for the rectangle
+          const selectedPixels = getSelectedPixelsInRectangle(completed.rectangle);
+
+          // Update selection state with rectangle
+          selectRectangle(completed.rectangle);
+
+          // Notify parent component of selection change with correct data
+          if (onSelectionChange) {
+            onSelectionChange({
+              selectedPixel: null,
+              selectedRectangle: completed.rectangle,
+              selectedPixels,
+              pixelCount: selectedPixels.length,
+            });
+          }
+
           setRectangleSelection(createRectangleSelection());
         }
       } else {
@@ -79,6 +102,19 @@ const Canvas: React.FC<CanvasProps> = ({
       setSelectedRectangle(null);
 
       // Handle single pixel selection
+      selectSinglePixel(x, y);
+
+      // Notify parent component of selection change
+      if (onSelectionChange) {
+        onSelectionChange({
+          selectedPixel: { x, y },
+          selectedRectangle: null,
+          selectedPixels: [{ x, y }],
+          pixelCount: 1,
+        });
+      }
+
+      // Handle legacy onPixelSelect callback
       if (onPixelSelect) {
         onPixelSelect(x, y);
       }
@@ -86,7 +122,7 @@ const Canvas: React.FC<CanvasProps> = ({
       // Store this as the last selected pixel for future rectangle selections
       setLastSelectedPixel({ x, y });
     }
-  }, [pixels, onPixelSelect, rectangleSelection, screenToWorld, lastSelectedPixel]);
+  }, [pixels, onPixelSelect, rectangleSelection, screenToWorld, lastSelectedPixel, selectSinglePixel, selectRectangle, selectionState, onSelectionChange]);
 
   // Use original canvas events for panning/zooming
   const {
@@ -107,6 +143,19 @@ const Canvas: React.FC<CanvasProps> = ({
     screenToWorld,
     onPixelSelect: (x, y) => {
       // Handle single pixel selection through the original system
+      selectSinglePixel(x, y);
+
+      // Notify parent component of selection change
+      if (onSelectionChange) {
+        onSelectionChange({
+          selectedPixel: { x, y },
+          selectedRectangle: null,
+          selectedPixels: [{ x, y }],
+          pixelCount: 1,
+        });
+      }
+
+      // Handle legacy onPixelSelect callback
       if (onPixelSelect) {
         onPixelSelect(x, y);
       }

@@ -6,12 +6,14 @@ interface CanvasContainerProps {
   pixels: Pixel[];
   selectedPixel: { x: number; y: number } | null;
   onPixelSelect: (x: number, y: number) => void;
+  onSelectionChange?: (selectionState: any) => void;
 }
 
 const CanvasContainer: React.FC<CanvasContainerProps> = ({
   pixels,
   selectedPixel,
-  onPixelSelect
+  onPixelSelect,
+  onSelectionChange
 }) => (
   <main
     className="canvas-container"
@@ -26,6 +28,7 @@ const CanvasContainer: React.FC<CanvasContainerProps> = ({
       pixels={pixels}
       onPixelSelect={onPixelSelect}
       selectedPixel={selectedPixel}
+      onSelectionChange={onSelectionChange}
       className="pixel-canvas"
     />
     <div className="canvas-overlay" aria-live="polite">

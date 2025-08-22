@@ -1,14 +1,44 @@
 import React from 'react';
 import ColorPicker from './ColorPicker';
-import { usePixelPurchase } from '../hooks/usePixelPurchase';
+import { usePixelPurchase, SelectionState } from '../hooks/usePixelPurchase';
 
 interface PurchasePanelProps {
   collapsed?: boolean;
   onToggle?: () => void;
+  selectionState?: SelectionState;
+  purchasedPixels?: { x: number; y: number }[];
 }
 
-const PurchasePanel: React.FC<PurchasePanelProps> = ({ collapsed, onToggle }) => {
-  const { state, setPixelType, setColor, setLetter, isValid, getDisplayPrice, getPriceForType } = usePixelPurchase();
+const PurchasePanel: React.FC<PurchasePanelProps> = ({
+  collapsed,
+  onToggle,
+  selectionState,
+  purchasedPixels = []
+}) => {
+  const {
+    state,
+    setPixelType,
+    setColor,
+    setLetter,
+    setSelection,
+    isValid,
+    getDisplayPrice,
+    getPriceForType,
+    getSelectedPixelCount,
+    getEstimatedValue,
+    getTotalDisplayPrice
+  } = usePixelPurchase();
+
+  // Update selection state when props change
+  React.useEffect(() => {
+    if (selectionState) {
+      setSelection(selectionState);
+    }
+  }, [selectionState, setSelection]);
+
+  // Calculate estimated value
+  const estimatedValue = getEstimatedValue(purchasedPixels);
+  const selectedCount = selectionState?.pixelCount || 0;
 
   return (
     <aside
@@ -95,23 +125,39 @@ const PurchasePanel: React.FC<PurchasePanelProps> = ({ collapsed, onToggle }) =>
           <div className="selection-summary" role="region" aria-label="Selection summary">
             <div className="summary-item">
               <span>Count:</span>
-              <span aria-label="Selected pixel count">0</span>
+              <span aria-label="Selected pixel count">{selectedCount}</span>
             </div>
             <div className="summary-item">
-              <span>Total:</span>
-              <span aria-label="Total cost in satoshis">0 sats</span>
+              <span>Available:</span>
+              <span aria-label="Available pixels to purchase">{estimatedValue.availableCount}</span>
+            </div>
+            <div className="summary-item">
+              <span>Already Purchased:</span>
+              <span aria-label="Already purchased pixels">{estimatedValue.purchasedCount}</span>
+            </div>
+            <div className="summary-item">
+              <span>New Pixels Price:</span>
+              <span aria-label="Price for new pixels">{estimatedValue.availablePixelsPrice} sats</span>
+            </div>
+            <div className="summary-item">
+              <span>Estimated Total:</span>
+              <span aria-label="Estimated total cost in satoshis">{getTotalDisplayPrice(purchasedPixels)}</span>
             </div>
           </div>
         </div>
 
         <div className="panel-section">
           <div className="price-display">
-            <span className="price-label">Price:</span>
+            <span className="price-label">Per Pixel:</span>
             <span className="price-value">{getDisplayPrice()}</span>
+          </div>
+          <div className="price-display">
+            <span className="price-label">Estimated Total:</span>
+            <span className="price-value">{getTotalDisplayPrice(purchasedPixels)}</span>
           </div>
           <button
             className="purchase-button"
-            disabled={!isValid()}
+            disabled={!isValid() || selectedCount === 0}
             aria-describedby="purchase-status"
           >
             Generate Invoice
@@ -119,7 +165,9 @@ const PurchasePanel: React.FC<PurchasePanelProps> = ({ collapsed, onToggle }) =>
           <div id="purchase-status" className="sr-only">
             {!isValid()
               ? 'Please select a valid color and letter (if required).'
-              : 'Ready to generate invoice.'
+              : selectedCount === 0
+                ? 'Please select pixels to purchase.'
+                : 'Ready to generate invoice.'
             }
           </div>
         </div>
