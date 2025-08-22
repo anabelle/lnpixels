@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { Server as SocketServer } from 'socket.io';
+import { PaymentsAdapter, NakaPayAdapter, MockPaymentsAdapter } from './payments.js';
+import { price } from './pricing.js';
 
 const router = Router();
 
 // In-memory storage for pixels (will be replaced with database later)
-let pixels: any[] = [
+export let pixels: any[] = [
   { x: 0, y: 0, color: '#ff0000', letter: 'H', sats: 100, created_at: Date.now() },
   { x: 1, y: 0, color: '#00ff00', letter: 'E', sats: 10, created_at: Date.now() },
   { x: 2, y: 0, color: '#0000ff', letter: 'L', sats: 1, created_at: Date.now() },
@@ -21,6 +23,11 @@ let pixels: any[] = [
   { x: 1, y: -1, color: '#8000ff', letter: 'L', sats: 100, created_at: Date.now() },
   { x: 2, y: -1, color: '#0080ff', letter: 'D', sats: 10, created_at: Date.now() },
 ];
+
+// Initialize payments adapter
+const paymentsAdapter: PaymentsAdapter = process.env.NAKAPAY_API_KEY
+  ? new NakaPayAdapter()
+  : new MockPaymentsAdapter();
 
 export function setupRoutes(io: SocketServer) {
   // API info endpoint (mounted at /api/)
@@ -72,6 +79,188 @@ export function setupRoutes(io: SocketServer) {
     );
 
     res.json(pixelsInRect);
+  });
+
+  // POST /invoices - Create invoice for single pixel purchase
+  router.post('/invoices', async (req, res) => {
+    try {
+      const { x, y, color, letter } = req.body;
+
+      // Validate input
+      if (typeof x !== 'number' || typeof y !== 'number') {
+        return res.status(400).json({ error: 'Invalid coordinates' });
+      }
+
+      // Find existing pixel to get last price
+      const existingPixel = pixels.find(p => p.x === x && p.y === y);
+      const lastPrice = existingPixel ? existingPixel.sats : null;
+
+      // Calculate price
+      const pixelPrice = price({ color, letter, lastPrice });
+
+      // Create invoice
+      const invoice = await paymentsAdapter.createInvoice(
+        pixelPrice,
+        `Pixel purchase: (${x}, ${y})`,
+        { x, y, color, letter }
+      );
+
+      res.json({
+        invoice: invoice.invoice,
+        payment_hash: invoice.payment_hash,
+        amount: pixelPrice,
+        id: invoice.id
+      });
+    } catch (error) {
+      console.error('Error creating invoice:', error);
+      res.status(500).json({ error: 'Failed to create invoice' });
+    }
+  });
+
+  // POST /invoices/bulk - Create bulk invoice for rectangle purchase
+  router.post('/invoices/bulk', async (req, res) => {
+    try {
+      const { x1, y1, x2, y2, color, letters } = req.body;
+
+      // Validate rectangle coordinates
+      if ([x1, y1, x2, y2].some(coord => typeof coord !== 'number')) {
+        return res.status(400).json({ error: 'Invalid rectangle coordinates' });
+      }
+
+      const width = Math.abs(x2 - x1) + 1;
+      const height = Math.abs(y2 - y1) + 1;
+      const totalPixels = width * height;
+
+      // Validate letters length
+      if (letters && letters.length > totalPixels) {
+        return res.status(400).json({ error: 'Too many letters for rectangle size' });
+      }
+
+      // Calculate total price
+      let totalPrice = 0;
+      const pixelUpdates: any[] = [];
+
+      for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+        for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+          const existingPixel = pixels.find(p => p.x === x && p.y === y);
+          const lastPrice = existingPixel ? existingPixel.sats : null;
+          const pixelPrice = price({ color, letter: null, lastPrice });
+          totalPrice += pixelPrice;
+
+          pixelUpdates.push({ x, y, color, letter: null, price: pixelPrice });
+        }
+      }
+
+      // Assign letters if provided
+      if (letters) {
+        let letterIndex = 0;
+        for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+          for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+            if (letterIndex < letters.length) {
+              const existingPixel = pixels.find(p => p.x === x && p.y === y);
+              const lastPrice = existingPixel ? existingPixel.sats : null;
+              const pixelPrice = price({ color, letter: letters[letterIndex], lastPrice });
+              totalPrice += (pixelPrice - price({ color, letter: null, lastPrice })); // Add letter premium
+              pixelUpdates.find(p => p.x === x && p.y === y)!.letter = letters[letterIndex];
+              letterIndex++;
+            }
+          }
+        }
+      }
+
+      // Create bulk invoice
+      const invoice = await paymentsAdapter.createInvoice(
+        totalPrice,
+        `Bulk pixel purchase: ${totalPixels} pixels`,
+        { x1, y1, x2, y2, color, letters, pixelUpdates }
+      );
+
+      res.json({
+        invoice: invoice.invoice,
+        payment_hash: invoice.payment_hash,
+        amount: totalPrice,
+        id: invoice.id,
+        pixelCount: totalPixels
+      });
+    } catch (error) {
+      console.error('Error creating bulk invoice:', error);
+      res.status(500).json({ error: 'Failed to create bulk invoice' });
+    }
+  });
+
+  // POST /payments/webhook - Handle payment webhooks
+  router.post('/payments/webhook', (req, res) => {
+    try {
+      const signature = req.headers['x-nakapay-signature'] as string;
+      const payload = req.body;
+
+      // Verify webhook signature
+      if (!paymentsAdapter.verifyWebhook(payload, signature)) {
+        return res.status(401).json({ error: 'Invalid signature' });
+      }
+
+      // Handle payment completion
+      if (payload.event === 'payment.completed') {
+        const metadata = payload.metadata;
+
+        if (metadata.pixelUpdates) {
+          // Bulk payment
+          metadata.pixelUpdates.forEach((update: any) => {
+            const existingIndex = pixels.findIndex(p => p.x === update.x && p.y === update.y);
+            const newPixel = {
+              x: update.x,
+              y: update.y,
+              color: update.color,
+              letter: update.letter,
+              sats: update.price,
+              created_at: Date.now()
+            };
+
+            if (existingIndex >= 0) {
+              pixels[existingIndex] = newPixel;
+            } else {
+              pixels.push(newPixel);
+            }
+
+            // Emit real-time update
+            io.emit('pixel.update', newPixel);
+          });
+        } else {
+          // Single pixel payment
+          const existingIndex = pixels.findIndex(p => p.x === metadata.x && p.y === metadata.y);
+          const newPixel = {
+            x: metadata.x,
+            y: metadata.y,
+            color: metadata.color,
+            letter: metadata.letter,
+            sats: payload.amount,
+            created_at: Date.now()
+          };
+
+          if (existingIndex >= 0) {
+            pixels[existingIndex] = newPixel;
+          } else {
+            pixels.push(newPixel);
+          }
+
+          // Emit real-time update
+          io.emit('pixel.update', newPixel);
+        }
+
+        // Emit activity update
+        io.emit('activity.append', {
+          type: 'payment',
+          amount: payload.amount,
+          timestamp: Date.now(),
+          metadata
+        });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error processing webhook:', error);
+      res.status(500).json({ error: 'Failed to process webhook' });
+    }
   });
 
   // Example endpoint to simulate pixel update (for testing)

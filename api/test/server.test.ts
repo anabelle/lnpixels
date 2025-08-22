@@ -42,7 +42,7 @@ describe('API Server', () => {
     });
 
     // Trigger the update via the test endpoint
-    await request(app).post('/api/test-update').expect(200);
+    await request(app).post('/test-update').expect(200);
 
     const data = await eventPromise;
     expect(data).toEqual({ x: 10, y: 20, color: '#ff0000', letter: 'A', sats: 100, created_at: expect.any(Number) });

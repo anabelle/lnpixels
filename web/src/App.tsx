@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './App.css';
+import 'nakapay-react/dist/styles.css';
 import { ThemeProvider } from './theme';
 import Header from './components/Header';
 import CanvasContainer from './components/CanvasContainer';

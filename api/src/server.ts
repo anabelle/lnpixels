@@ -1,8 +1,12 @@
+import 'dotenv/config';
 import express from 'express';
 import { setupSocket } from './socket';
 import { setupRoutes } from './routes';
 
 const app = express();
+
+// Middleware to parse JSON request bodies
+app.use(express.json());
 
 // Setup Socket.IO
 const { server, io } = setupSocket(app);

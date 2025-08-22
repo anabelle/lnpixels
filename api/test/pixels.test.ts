@@ -3,11 +3,14 @@ import request from 'supertest';
 import express from 'express';
 import { setupSocket } from '../src/socket';
 import { setupRoutes } from '../src/routes';
+import { pixels } from '../src/routes';
 
 describe('GET /api/pixels', () => {
   let app: express.Application;
 
   beforeEach(() => {
+    // Reset pixels array for clean tests
+    pixels.length = 0;
     app = express();
     const { io } = setupSocket(app);
     app.use(setupRoutes(io));
@@ -15,7 +18,7 @@ describe('GET /api/pixels', () => {
 
   it('should return empty array when no pixels exist', async () => {
     const response = await request(app)
-      .get('/api/pixels?x1=0&y1=0&x2=10&y2=10')
+      .get('/pixels?x1=0&y1=0&x2=10&y2=10')
       .expect(200);
 
     expect(response.body).toEqual([]);
@@ -25,7 +28,7 @@ describe('GET /api/pixels', () => {
     // This test will fail initially since we haven't implemented pixel storage yet
     // We'll implement the endpoint to make this pass
     const response = await request(app)
-      .get('/api/pixels?x1=0&y1=0&x2=5&y2=5')
+      .get('/pixels?x1=0&y1=0&x2=5&y2=5')
       .expect(200);
 
     expect(Array.isArray(response.body)).toBe(true);
@@ -33,7 +36,7 @@ describe('GET /api/pixels', () => {
 
   it('should validate rectangle parameters', async () => {
     const response = await request(app)
-      .get('/api/pixels?x1=invalid&y1=0&x2=10&y2=10')
+      .get('/pixels?x1=invalid&y1=0&x2=10&y2=10')
       .expect(400);
 
     expect(response.body).toHaveProperty('error');

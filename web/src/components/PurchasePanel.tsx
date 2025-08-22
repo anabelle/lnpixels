@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ColorPicker from './ColorPicker';
+import PaymentModal from './PaymentModal';
 import { usePixelPurchase, SelectionState } from '../hooks/usePixelPurchase';
 
 interface PurchasePanelProps {
@@ -15,6 +16,9 @@ const PurchasePanel: React.FC<PurchasePanelProps> = ({
   selectionState,
   purchasedPixels = []
 }) => {
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
   const {
     state,
     setPixelType,
@@ -28,6 +32,13 @@ const PurchasePanel: React.FC<PurchasePanelProps> = ({
     getEstimatedValue,
     getTotalDisplayPrice
   } = usePixelPurchase();
+
+  // Debug modal state changes
+  React.useEffect(() => {
+    console.log('PurchasePanel: isPaymentModalOpen changed to:', isPaymentModalOpen);
+    console.log('PurchasePanel: selectionState:', selectionState);
+    console.log('PurchasePanel: isValid():', isValid());
+  }, [isPaymentModalOpen, selectionState, isValid]);
 
   // Update selection state when props change
   React.useEffect(() => {
@@ -155,24 +166,70 @@ const PurchasePanel: React.FC<PurchasePanelProps> = ({
             <span className="price-label">Estimated Total:</span>
             <span className="price-value">{getTotalDisplayPrice(purchasedPixels)}</span>
           </div>
+          {paymentError && (
+            <div className="error-message" role="alert">
+              {paymentError}
+            </div>
+          )}
           <button
             className="purchase-button"
             disabled={!isValid() || selectedCount === 0}
+                  onClick={() => {
+              console.log('Purchase button clicked', { isValid: isValid(), selectedCount, selectionState });
+              console.log('Current payment modal state:', isPaymentModalOpen);
+              console.log('Pixel type from state:', state.type);
+              console.log('Pixel color from state:', state.color);
+              console.log('Pixel letter from state:', state.letter);
+              console.log('Setting payment modal to open...');
+              setIsPaymentModalOpen(true);
+              console.log('Payment modal state should now be true');
+            }}
             aria-describedby="purchase-status"
           >
-            Generate Invoice
+            Purchase Pixels
           </button>
           <div id="purchase-status" className="sr-only">
             {!isValid()
               ? 'Please select a valid color and letter (if required).'
               : selectedCount === 0
                 ? 'Please select pixels to purchase.'
-                : 'Ready to generate invoice.'
+                : 'Ready to purchase pixels.'
             }
           </div>
         </div>
       </>
     )}
+
+    <PaymentModal
+      isOpen={isPaymentModalOpen}
+      onClose={() => {
+        console.log('PurchasePanel onClose called');
+        console.log('Current payment modal state before close:', isPaymentModalOpen);
+        setIsPaymentModalOpen(false);
+        setPaymentError(null);
+        console.log('Payment modal state after close should be false');
+      }}
+      selectionState={selectionState || {
+        selectedPixel: null,
+        selectedRectangle: null,
+        selectedPixels: [],
+        pixelCount: 0
+      }}
+      purchasedPixels={purchasedPixels}
+      pixelType={state.type}
+      color={state.color}
+      letter={state.letter}
+      onPaymentSuccess={(payment) => {
+        console.log('Payment completed successfully:', payment);
+        setPaymentError(null);
+        // The payment success will be handled by the webhook
+        // which will emit real-time updates via WebSocket
+      }}
+      onPaymentError={(error) => {
+        console.error('Payment failed:', error);
+        setPaymentError(error.message || 'Payment failed. Please try again.');
+      }}
+    />
   </aside>
   );
 };

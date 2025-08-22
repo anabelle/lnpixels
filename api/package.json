@@ -13,8 +13,10 @@
   "license": "ISC",
   "dependencies": {
     "better-sqlite3": "^12.2.0",
+    "dotenv": "^17.2.1",
     "eslint": "^9.33.0",
     "express": "^5.1.0",
+    "nakapay-sdk": "^0.1.4",
     "nostr-tools": "^2.16.2",
     "socket.io": "^4.8.1",
     "supertest": "^7.1.4",

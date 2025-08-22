@@ -975,3 +975,463 @@ body {
     align-self: center;
   }
 }
+
+/* Payment Modal Styles - Polished Design */
+.payment-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.payment-modal {
+  background: var(--bg-primary);
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  max-width: 520px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: hidden;
+  border: 1px solid var(--border-primary);
+  animation: slideIn 0.3s ease-out;
+  position: relative;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.payment-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.75rem 2rem 1rem;
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.payment-modal-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--accent-primary) 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.payment-modal-content {
+  padding: 2rem;
+  max-height: calc(90vh - 140px);
+  overflow-y: auto;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--border-primary);
+  border-top: 4px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+}
+
+.loading-state p {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  margin: 0;
+  font-weight: 500;
+}
+
+/* NakaPay Modal Integration Styles */
+.nakapay-modal-overlay {
+  z-index: 9999 !important; /* Ensure it appears above everything */
+}
+
+.nakapay-modal {
+  z-index: 10000 !important; /* Modal content above overlay */
+  max-width: 600px !important;
+  width: 95% !important;
+  margin: 1rem !important;
+  background: var(--bg-primary) !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--border-primary) !important;
+}
+
+/* Ensure QR code and payment elements are visible */
+.nakapay-qr-container,
+.nakapay-qr-code,
+.qr-code,
+.qr-container {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  margin: 1rem auto !important;
+  max-width: 300px !important;
+  width: 100% !important;
+  height: auto !important;
+}
+
+.nakapay-payment-info,
+.payment-info,
+.invoice-info {
+  display: block !important;
+  visibility: visible !important;
+  margin: 1rem 0 !important;
+  padding: 1rem !important;
+  background: var(--bg-tertiary) !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border-secondary) !important;
+}
+
+.nakapay-invoice-text,
+.invoice-text,
+.lightning-invoice {
+  word-break: break-all !important;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+  font-size: 0.8rem !important;
+  background: var(--bg-tertiary) !important;
+  padding: 0.75rem !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--border-primary) !important;
+  margin: 1rem 0 !important;
+  color: var(--text-primary) !important;
+}
+
+.nakapay-modal {
+  max-width: 600px !important;
+  width: 95% !important;
+  margin: 1rem !important;
+}
+
+.nakapay-button {
+  background: var(--accent-primary) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 0.75rem 1.5rem !important;
+  font-size: 1rem !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s !important;
+}
+
+.nakapay-button:hover {
+  background: var(--accent-hover) !important;
+}
+
+.nakapay-button:disabled {
+  background: var(--text-tertiary) !important;
+  cursor: not-allowed !important;
+}
+
+/* Ensure QR code and payment interface are visible */
+.nakapay-modal-content {
+  padding: 1.5rem !important;
+}
+
+.nakapay-qr-code {
+  margin: 1rem auto !important;
+  display: block !important;
+}
+
+.nakapay-invoice-text {
+  word-break: break-all !important;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+  font-size: 0.8rem !important;
+  background: var(--bg-tertiary) !important;
+  padding: 0.75rem !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--border-primary) !important;
+  margin: 1rem 0 !important;
+}
+
+/* QR Code and Invoice Styles - Enhanced */
+.qr-section {
+  margin: 2rem 0;
+  text-align: center;
+  background: var(--bg-tertiary);
+  padding: 2rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-primary);
+}
+
+.qr-section h4 {
+  margin: 0 0 1.5rem 0;
+  color: var(--text-primary);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.qr-code-container {
+  display: flex;
+  justify-content: center;
+  margin: 1.5rem 0;
+  padding: 1rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.qr-code-image {
+  max-width: 280px;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.invoice-section {
+  margin: 2rem 0;
+}
+
+.invoice-section h4 {
+  margin: 0 0 1.5rem 0;
+  color: var(--text-primary);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.invoice-text-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.invoice-textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 1rem;
+  border: 2px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  resize: vertical;
+  cursor: text;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.invoice-textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  background: var(--bg-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.copy-button {
+  align-self: flex-start;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, var(--accent-primary) 0%, #8b5cf6 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.copy-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+}
+
+.copy-button:active {
+  transform: translateY(0);
+}
+
+.payment-instructions {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+  border-radius: 12px;
+  border: 1px solid var(--border-primary);
+  position: relative;
+}
+
+.payment-instructions::before {
+  content: "💡";
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  font-size: 1.2rem;
+}
+
+.payment-instructions p {
+  margin: 0 0 0 2rem;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+/* Payment Summary Styles */
+.payment-summary {
+  background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  border: 1px solid var(--border-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+.payment-summary::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--accent-primary) 0%, #8b5cf6 50%, #06b6d4 100%);
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-primary);
+  transition: all 0.2s ease;
+}
+
+.summary-item:last-child {
+  border-bottom: none;
+}
+
+.summary-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  margin: 0 -0.5rem;
+  padding: 0.75rem 0.5rem;
+}
+
+.summary-item span:first-child {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.summary-item span:last-child {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.amount {
+  color: var(--accent-primary);
+  font-weight: 700;
+  font-size: 1.3rem;
+  text-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+}
+
+/* Close Button Styles */
+.close-button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.75rem;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-button:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  transform: scale(1.1);
+}
+
+.close-button:active {
+  transform: scale(0.95);
+}
+
+/* Mobile responsive for payment modal */
+@media (max-width: 768px) {
+  .payment-modal {
+    width: 95%;
+    margin: 1rem;
+  }
+
+  .payment-modal-content {
+    padding: 1rem;
+  }
+
+  .qr-code-image {
+    max-width: 200px;
+  }
+
+  .invoice-textarea {
+    font-size: 0.7rem;
+    min-height: 60px;
+  }
+
+  .nakapay-qr-code {
+    max-width: 250px !important;
+    height: auto !important;
+  }
+
+  .nakapay-invoice-text {
+    font-size: 0.7rem !important;
+  }
+}
+
+  .payment-modal-content {
+    padding: 1rem;
+  }
+
+  .nakapay-modal {
+    width: 98% !important;
+    margin: 0.5rem !important;
+  }
+
+  .nakapay-qr-code {
+    max-width: 250px !important;
+    height: auto !important;
+  }
+
+  .nakapay-invoice-text {
+    font-size: 0.7rem !important;
+  }
+}
