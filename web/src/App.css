@@ -221,11 +221,25 @@ body {
 .purchase-panel.collapsed,
 .activity-feed.collapsed {
   overflow: hidden;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.purchase-panel.collapsed:hover,
+.activity-feed.collapsed:hover {
+  background-color: #f1f5f9;
 }
 
 .purchase-panel.collapsed .panel-section,
 .activity-feed.collapsed .panel-section {
   display: none;
+}
+
+.purchase-panel.collapsed .panel-header,
+.activity-feed.collapsed .panel-header {
+  padding: 1rem;
+  justify-content: center;
+  cursor: pointer;
 }
 
 .purchase-panel.collapsed .panel-header h3,
@@ -236,6 +250,7 @@ body {
   margin: 0;
   font-size: 0.9rem;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .activity-feed.collapsed .panel-header h3 {
@@ -244,6 +259,12 @@ body {
   margin: 0;
   font-size: 0.9rem;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.purchase-panel.collapsed .toggle-button,
+.activity-feed.collapsed .toggle-button {
+  display: none; /* Hide toggle button when collapsed - whole area is clickable */
 }
 
 .panel-section {

@@ -52,10 +52,15 @@ const Canvas = () => (
 );
 
 const PurchasePanel = ({ collapsed, onToggle }: { collapsed?: boolean; onToggle?: () => void }) => (
-  <aside className={`purchase-panel ${collapsed ? 'collapsed' : ''}`} role="complementary" aria-label="Purchase panel">
-    <div className="panel-header">
+  <aside
+    className={`purchase-panel ${collapsed ? 'collapsed' : ''}`}
+    role="complementary"
+    aria-label="Purchase panel"
+    onClick={collapsed ? onToggle : undefined}
+  >
+    <div className="panel-header" onClick={collapsed ? onToggle : undefined}>
       <h3>Pixel Purchase</h3>
-      {onToggle && (
+      {onToggle && !collapsed && (
         <button
           className="toggle-button"
           onClick={onToggle}
@@ -110,10 +115,15 @@ const PurchasePanel = ({ collapsed, onToggle }: { collapsed?: boolean; onToggle?
 );
 
 const ActivityFeed = ({ collapsed, onToggle }: { collapsed?: boolean; onToggle?: () => void }) => (
-  <aside className={`activity-feed ${collapsed ? 'collapsed' : ''}`} role="complementary" aria-label="Activity feed">
-    <div className="panel-header">
+  <aside
+    className={`activity-feed ${collapsed ? 'collapsed' : ''}`}
+    role="complementary"
+    aria-label="Activity feed"
+    onClick={collapsed ? onToggle : undefined}
+  >
+    <div className="panel-header" onClick={collapsed ? onToggle : undefined}>
       <h3>Recent Activity</h3>
-      {onToggle && (
+      {onToggle && !collapsed && (
         <button
           className="toggle-button"
           onClick={onToggle}
