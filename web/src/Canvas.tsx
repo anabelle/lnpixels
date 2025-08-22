@@ -42,67 +42,32 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // No zoom limits needed - pixel size is fixed
 
-  // Handle canvas resize with stable view preservation
+  // Handle canvas resize with stable pixel size
   useEffect(() => {
-    let resizeTimeout: NodeJS.Timeout;
-    let lastResizeTime = 0;
-    let lastWidth = dimensions.width;
-
     const updateDimensions = () => {
       if (canvasRef.current) {
         const rect = canvasRef.current.getBoundingClientRect();
-        const newDimensions = { width: rect.width, height: rect.height };
+        const newDimensions = {
+          width: Math.round(rect.width),
+          height: Math.round(rect.height)
+        };
 
-        // Only update if dimensions actually changed significantly
-        if (Math.abs(newDimensions.width - dimensions.width) > 5 ||
-            Math.abs(newDimensions.height - dimensions.height) > 5) {
-
-          const now = Date.now();
-          const timeSinceLastResize = now - lastResizeTime;
-          const widthChange = Math.abs(newDimensions.width - lastWidth);
-
-          // Detect sidebar toggles: rapid width changes of specific sizes
-          const isLikelySidebarToggle = timeSinceLastResize < 300 &&
-                                      widthChange > 50 &&
-                                      widthChange < 400;
-
-          lastResizeTime = now;
-          lastWidth = newDimensions.width;
-
-          if (isLikelySidebarToggle) {
-            // Sidebar toggle: just update canvas size, maintain view
-            canvasRef.current.width = rect.width;
-            canvasRef.current.height = rect.height;
-            setDimensions(newDimensions);
-            setIsLayoutChanging(true);
-
-            // Reset layout changing flag after animation
-            setTimeout(() => setIsLayoutChanging(false), 300);
-          } else {
-            // Normal resize: update dimensions and viewport
-            setDimensions(newDimensions);
-            canvasRef.current.width = rect.width;
-            canvasRef.current.height = rect.height;
-          }
-        }
+        // Always update canvas size to match container
+        canvasRef.current.width = newDimensions.width;
+        canvasRef.current.height = newDimensions.height;
+        setDimensions(newDimensions);
       }
     };
 
-    const debouncedUpdate = () => {
-      clearTimeout(resizeTimeout);
-      resizeTimeout = setTimeout(updateDimensions, 16); // ~60fps for smooth updates
-    };
-
+    // Initial setup
     updateDimensions();
-    window.addEventListener('resize', debouncedUpdate);
 
-    // Listen for layout changes on the canvas container
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.target === canvasRef.current?.parentElement) {
-          debouncedUpdate();
-        }
-      }
+    // Listen to window resize
+    window.addEventListener('resize', updateDimensions);
+
+    // Also listen to layout changes (sidebar toggles, etc.)
+    const resizeObserver = new ResizeObserver(() => {
+      updateDimensions();
     });
 
     if (canvasRef.current?.parentElement) {
@@ -110,11 +75,10 @@ const Canvas: React.FC<CanvasProps> = ({
     }
 
     return () => {
-      clearTimeout(resizeTimeout);
-      window.removeEventListener('resize', debouncedUpdate);
+      window.removeEventListener('resize', updateDimensions);
       resizeObserver.disconnect();
     };
-  }, [dimensions]);
+  }, []); // Simple, direct updates without complex debouncing
 
   // Convert screen coordinates to world coordinates
   const screenToWorld = useCallback((screenX: number, screenY: number): { x: number; y: number } => {
