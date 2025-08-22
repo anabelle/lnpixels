@@ -32,6 +32,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [paymentId, setPaymentId] = useState<string | null>(null);
 
   console.log('PaymentModal render:', { isOpen, selectionState, pixelType, color, letter });
   console.log('PaymentModal render check:', { isOpen, isLoading, payment: !!payment });
@@ -123,6 +124,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       const paymentData = await response.json();
       console.log('Payment data received:', paymentData);
       setPayment(paymentData);
+      setPaymentId(paymentData.id); // Store payment ID for tracking
     } catch (error) {
       console.error('Error creating payment:', error);
       onPaymentError(error);
@@ -172,24 +174,50 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       newSocket.on('pixel.update', (updatedPixel: any) => {
         console.log('PaymentModal received pixel update:', updatedPixel);
 
-        // Check if this update matches our current payment
-        if (payment && (
-          (selectionState.selectedPixels?.length === 1 &&
-           updatedPixel.x === selectionState.selectedPixels[0].x &&
-           updatedPixel.y === selectionState.selectedPixels[0].y) ||
-          (selectionState.selectedRectangle &&
-           updatedPixel.x >= selectionState.selectedRectangle.x1 &&
-           updatedPixel.x <= selectionState.selectedRectangle.x2 &&
-           updatedPixel.y >= selectionState.selectedRectangle.y1 &&
-           updatedPixel.y <= selectionState.selectedRectangle.y2)
-        )) {
-          console.log('Payment confirmed! Pixel updated successfully');
-          setPaymentSuccess(true);
+        // Only process updates if we have an active payment
+        if (!payment || !paymentId) {
+          console.log('No active payment, ignoring pixel update');
+          return;
+        }
 
-          // Auto-close after showing success for 3 seconds
-          setTimeout(() => {
-            handlePaymentSuccess(updatedPixel);
-          }, 3000);
+        // Check if this update matches our current payment coordinates
+        const isSinglePixelMatch = selectionState.selectedPixels?.length === 1 &&
+          updatedPixel.x === selectionState.selectedPixels[0].x &&
+          updatedPixel.y === selectionState.selectedPixels[0].y;
+
+        const isRectangleMatch = selectionState.selectedRectangle &&
+          updatedPixel.x >= selectionState.selectedRectangle.x1 &&
+          updatedPixel.x <= selectionState.selectedRectangle.x2 &&
+          updatedPixel.y >= selectionState.selectedRectangle.y1 &&
+          updatedPixel.y <= selectionState.selectedRectangle.y2;
+
+        if (isSinglePixelMatch || isRectangleMatch) {
+          console.log('Payment confirmed! Pixel updated successfully for payment:', paymentId);
+          console.log('Updated pixel coordinates:', { x: updatedPixel.x, y: updatedPixel.y });
+          console.log('Payment type:', selectionState.selectedPixels?.length === 1 ? 'single' : 'bulk');
+
+          // For single pixels, show success immediately
+          if (selectionState.selectedPixels?.length === 1) {
+            console.log('Single pixel payment - showing success immediately');
+            setPaymentSuccess(true);
+            setTimeout(() => {
+              handlePaymentSuccess(updatedPixel);
+            }, 3000);
+          } else {
+            // For bulk payments, show success after a brief delay to ensure all pixels are processed
+            console.log('Bulk payment - waiting for all pixels to be processed');
+            setTimeout(() => {
+              if (!paymentSuccess) { // Only set if not already set
+                console.log('Bulk payment confirmed - showing success');
+                setPaymentSuccess(true);
+                setTimeout(() => {
+                  handlePaymentSuccess(updatedPixel);
+                }, 3000);
+              }
+            }, 500); // Small delay for bulk payments
+          }
+        } else {
+          console.log('Pixel update does not match current payment coordinates');
         }
       });
 
@@ -214,6 +242,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       // Always reset and create new payment when modal opens
       console.log('Modal opened, resetting and creating new payment');
       setPayment(null);
+      setPaymentId(null);
       setPaymentSuccess(false);
       setIsLoading(true);
       handleCreatePayment();
@@ -221,6 +250,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       // Reset state when modal closes
       console.log('Modal closed, resetting state');
       setPayment(null);
+      setPaymentId(null);
       setPaymentSuccess(false);
       setIsLoading(false);
     }
