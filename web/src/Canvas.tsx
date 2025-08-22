@@ -27,21 +27,19 @@ const Canvas: React.FC<CanvasProps> = ({
   className = ''
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  // Fixed pixel size - this should never change
+  const PIXEL_SIZE = 20; // pixels per world unit
+
   const [viewport, setViewport] = useState<Viewport>({
     x: 0,
     y: 0,
-    zoom: 20, // 20 pixels per world unit (stable pixel size)
+    zoom: PIXEL_SIZE, // Always maintain fixed pixel size
   });
-
-  // Maintain stable pixel size regardless of container size
-  const stablePixelSize = 20; // pixels per world unit
   const [isPanning, setIsPanning] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
-  // Constants for zoom limits
-  const MIN_ZOOM = 5;
-  const MAX_ZOOM = 100;
+  // No zoom limits needed - pixel size is fixed
 
   // Handle canvas resize with stable pixel size
   useEffect(() => {
@@ -169,12 +167,19 @@ const Canvas: React.FC<CanvasProps> = ({
 
     // Draw coordinates in corner
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(10, 10, 120, 40);
+    ctx.fillRect(10, 10, 100, 30);
     ctx.fillStyle = '#ffffff';
     ctx.font = '12px Arial';
     ctx.fillText(`X: ${Math.floor(viewport.x)}, Y: ${Math.floor(viewport.y)}`, 15, 25);
-    ctx.fillText(`Zoom: ${viewport.zoom.toFixed(1)}x`, 15, 40);
+    ctx.fillText(`Pixel Size: ${PIXEL_SIZE}px`, 15, 40);
   }, [viewport, dimensions, pixels, selectedPixel]);
+
+  // Ensure zoom is always fixed to pixel size
+  useEffect(() => {
+    if (viewport.zoom !== PIXEL_SIZE) {
+      setViewport(prev => ({ ...prev, zoom: PIXEL_SIZE }));
+    }
+  }, [viewport.zoom]);
 
   // Re-render when dependencies change
   useEffect(() => {
@@ -213,27 +218,13 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
-  const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    // Reset to stable zoom level
-    setViewport(prev => ({
-      ...prev,
-      zoom: stablePixelSize,
-    }));
-  };
+  // No double-click needed - pixel size is always fixed
 
+  // No wheel zoom - pixel size is fixed
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     e.stopPropagation();
-
-    // More subtle zoom changes to maintain pixel stability
-    const zoomFactor = e.deltaY > 0 ? 0.95 : 1.05;
-    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom * zoomFactor));
-
-    setViewport(prev => ({
-      ...prev,
-      zoom: newZoom,
-    }));
+    // Pixel size remains fixed - no zooming allowed
   };
 
   // Touch event handlers for mobile
@@ -279,7 +270,6 @@ const Canvas: React.FC<CanvasProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onClick={handleClick}
-      onDoubleClick={handleDoubleClick}
       onWheel={handleWheel}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}

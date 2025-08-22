@@ -192,6 +192,8 @@ body {
   display: flex;
   align-items: stretch;
   min-width: 0; /* Prevent horizontal squishing */
+  width: 100%;
+  height: 100%;
 }
 
 .pixel-canvas {
@@ -573,6 +575,8 @@ body {
 
   .canvas-container {
     margin-bottom: 70px; /* Account for mobile tabs */
+    width: 100%;
+    height: calc(100vh - 130px); /* Full height minus header and tabs */
   }
 
   /* Mobile panel styles when shown */
@@ -590,6 +594,8 @@ body {
     flex-direction: column;
     background: var(--bg-primary);
     overflow-y: auto;
+    width: 100vw;
+    height: calc(100vh - 130px);
   }
 
   .purchase-panel:not(.collapsed) .panel-header,
