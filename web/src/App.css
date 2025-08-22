@@ -179,6 +179,7 @@ body {
   flex-direction: column;
   overflow: hidden;
   transition: background-color 0.3s ease, border-color 0.3s ease;
+  position: relative; /* Establish positioning context */
 }
 
 .canvas {
@@ -188,6 +189,8 @@ body {
   background: var(--bg-secondary);
   transition: background-color 0.3s ease;
   min-height: 0; /* Important: allows flex item to shrink below content size */
+  display: flex;
+  align-items: stretch;
 }
 
 .pixel-canvas {
@@ -195,11 +198,6 @@ body {
   height: 100%;
   display: block;
   background: var(--bg-secondary);
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
 }
 
 .canvas-placeholder {
