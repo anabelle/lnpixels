@@ -4,15 +4,29 @@ import express from 'express';
 
 export function setupSocket(app: express.Application) {
   const server = createServer(app);
-  const io = new SocketServer(server);
+  const io = new SocketServer(server, {
+    cors: {
+      origin: [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://lnpixels.heyanabelle.com",
+        "https://vm-522.lnvps.cloud"
+      ],
+      methods: ["GET", "POST"],
+      credentials: true
+    }
+  });
 
-  // Socket.IO event handling can be added here as needed
-  io.on('connection', (socket) => {
-    console.log('Client connected:', socket.id);
+  // Create namespace for API endpoints
+  const apiNamespace = io.of('/api');
+
+  // Socket.IO event handling on /api namespace
+  apiNamespace.on('connection', (socket) => {
+    console.log('Client connected to /api namespace:', socket.id);
     socket.on('disconnect', () => {
-      console.log('Client disconnected:', socket.id);
+      console.log('Client disconnected from /api namespace:', socket.id);
     });
   });
 
-  return { server, io };
+  return { server, io: apiNamespace };
 }

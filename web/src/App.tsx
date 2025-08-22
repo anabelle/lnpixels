@@ -95,6 +95,7 @@ function AppContent() {
                 onToggle={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
                 selectionState={selectionState}
                 purchasedPixels={pixels}
+                allPixels={pixels}
               />
               <CanvasContainer
                 pixels={pixels}
@@ -129,12 +130,13 @@ function AppContent() {
                   }}
                 />
               )}
-              {activeTab === 'purchase' && (
-                <PurchasePanel
-                  selectionState={selectionState}
-                  purchasedPixels={pixels}
-                />
-              )}
+               {activeTab === 'purchase' && (
+                 <PurchasePanel
+                   selectionState={selectionState}
+                   purchasedPixels={pixels}
+                   allPixels={pixels}
+                 />
+               )}
             {activeTab === 'activity' && <ActivityFeed />}
             <MobileTabs activeTab={activeTab} onTabChange={setActiveTab} />
           </>

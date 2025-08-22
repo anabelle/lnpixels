@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { Server as SocketServer } from 'socket.io';
+import { Namespace } from 'socket.io';
 import { PaymentsAdapter, NakaPayAdapter, MockPaymentsAdapter } from './payments.js';
 import { price } from './pricing.js';
 
@@ -32,7 +32,7 @@ const paymentsAdapter: PaymentsAdapter = process.env.NAKAPAY_API_KEY
   ? new NakaPayAdapter()
   : new MockPaymentsAdapter();
 
-export function setupRoutes(io: SocketServer) {
+export function setupRoutes(io: Namespace) {
   // API info endpoint (mounted at /api/)
   router.get('/', (req, res) => res.json({
     name: 'LNPixels API',

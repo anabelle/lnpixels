@@ -4,18 +4,20 @@ import PaymentModal from './PaymentModal';
 import { usePixelPurchase, SelectionState } from '../hooks/usePixelPurchase';
 
 interface PurchasePanelProps {
-  collapsed?: boolean;
-  onToggle?: () => void;
-  selectionState?: SelectionState;
-  purchasedPixels?: { x: number; y: number }[];
-}
+   collapsed?: boolean;
+   onToggle?: () => void;
+   selectionState?: SelectionState;
+   purchasedPixels?: { x: number; y: number; sats: number }[];
+   allPixels?: { x: number; y: number; color?: string; letter?: string; sats: number }[];
+ }
 
 const PurchasePanel: React.FC<PurchasePanelProps> = ({
-  collapsed,
-  onToggle,
-  selectionState,
-  purchasedPixels = []
-}) => {
+   collapsed,
+   onToggle,
+   selectionState,
+   purchasedPixels = [],
+   allPixels = []
+ }) => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
@@ -216,6 +218,7 @@ const PurchasePanel: React.FC<PurchasePanelProps> = ({
         pixelCount: 0
       }}
       purchasedPixels={purchasedPixels}
+      allPixels={allPixels}
       pixelType={state.type}
       color={state.color}
       letter={state.letter}

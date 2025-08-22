@@ -116,8 +116,8 @@ export function usePixels(): UsePixelsResult {
   // Setup WebSocket connection for real-time updates
   useEffect(() => {
     // Connect to the backend WebSocket server
-    socketRef.current = io('/', {
-      path: '/api/socket.io', // Socket.IO path
+    // Vite proxy handles the connection in development
+    socketRef.current = io('/api', {
       transports: ['websocket', 'polling']
     });
 
