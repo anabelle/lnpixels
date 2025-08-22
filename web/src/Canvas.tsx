@@ -30,8 +30,11 @@ const Canvas: React.FC<CanvasProps> = ({
   const [viewport, setViewport] = useState<Viewport>({
     x: 0,
     y: 0,
-    zoom: 20, // 20 pixels per world unit (good for pixel art)
+    zoom: 20, // 20 pixels per world unit (stable pixel size)
   });
+
+  // Maintain stable pixel size regardless of container size
+  const stablePixelSize = 20; // pixels per world unit
   const [isPanning, setIsPanning] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
@@ -40,21 +43,37 @@ const Canvas: React.FC<CanvasProps> = ({
   const MIN_ZOOM = 5;
   const MAX_ZOOM = 100;
 
-  // Handle canvas resize
+  // Handle canvas resize with stable pixel size
   useEffect(() => {
+    let resizeTimeout: NodeJS.Timeout;
+
     const updateDimensions = () => {
       if (canvasRef.current) {
         const rect = canvasRef.current.getBoundingClientRect();
-        setDimensions({ width: rect.width, height: rect.height });
-        canvasRef.current.width = rect.width;
-        canvasRef.current.height = rect.height;
+        const newDimensions = { width: rect.width, height: rect.height };
+
+        // Only update if dimensions actually changed significantly
+        if (Math.abs(newDimensions.width - dimensions.width) > 10 ||
+            Math.abs(newDimensions.height - dimensions.height) > 10) {
+          setDimensions(newDimensions);
+          canvasRef.current.width = rect.width;
+          canvasRef.current.height = rect.height;
+        }
       }
     };
 
+    const debouncedUpdate = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(updateDimensions, 100);
+    };
+
     updateDimensions();
-    window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
-  }, []);
+    window.addEventListener('resize', debouncedUpdate);
+    return () => {
+      clearTimeout(resizeTimeout);
+      window.removeEventListener('resize', debouncedUpdate);
+    };
+  }, [dimensions]);
 
   // Convert screen coordinates to world coordinates
   const screenToWorld = useCallback((screenX: number, screenY: number): { x: number; y: number } => {
@@ -194,11 +213,21 @@ const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
+  const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    // Reset to stable zoom level
+    setViewport(prev => ({
+      ...prev,
+      zoom: stablePixelSize,
+    }));
+  };
+
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     e.stopPropagation();
 
-    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+    // More subtle zoom changes to maintain pixel stability
+    const zoomFactor = e.deltaY > 0 ? 0.95 : 1.05;
     const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom * zoomFactor));
 
     setViewport(prev => ({
@@ -250,6 +279,7 @@ const Canvas: React.FC<CanvasProps> = ({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       onWheel={handleWheel}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}

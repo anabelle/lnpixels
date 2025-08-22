@@ -191,6 +191,7 @@ body {
   min-height: 0; /* Important: allows flex item to shrink below content size */
   display: flex;
   align-items: stretch;
+  min-width: 0; /* Prevent horizontal squishing */
 }
 
 .pixel-canvas {
@@ -198,6 +199,9 @@ body {
   height: 100%;
   display: block;
   background: var(--bg-secondary);
+  image-rendering: pixelated; /* Maintain pixel crispness */
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
 }
 
 .canvas-placeholder {
