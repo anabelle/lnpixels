@@ -17,6 +17,7 @@
     "@vitejs/plugin-react": "^5.0.1",
     "happy-dom": "^18.0.1",
     "nostr-tools": "^2.16.2",
+    "nuqs": "^2.5.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "shadcn-ui": "^0.9.5",

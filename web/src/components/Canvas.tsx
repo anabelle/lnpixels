@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Pixel, CanvasProps } from '../types/canvas';
-import { useViewport } from '../hooks/useViewport';
+import { useViewportWithUrl } from '../hooks/useViewportWithUrl';
 import { useCanvasCoordinates } from '../hooks/useCanvasCoordinates';
 import { useCanvasEvents } from '../hooks/useCanvasEvents';
 
@@ -15,7 +15,7 @@ const Canvas: React.FC<CanvasProps> = ({
   const [isLayoutChanging, setIsLayoutChanging] = useState(false);
 
   // Use custom hooks for modular logic
-  const { viewport, pan, zoom } = useViewport();
+  const { viewport, pan, zoom } = useViewportWithUrl();
   const { screenToWorld, worldToScreen } = useCanvasCoordinates(canvasRef, viewport, dimensions);
   const {
     isPanning,
