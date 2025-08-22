@@ -23,7 +23,7 @@ describe('ColorPicker', () => {
 
   it('should display color preview', () => {
     render(<ColorPicker {...defaultProps} />);
-    const preview = screen.getByRole('button', { name: /color preview/i });
+    const preview = screen.getByRole('button', { name: /open color picker/i });
     expect(preview).toBeInTheDocument();
     expect(preview).toHaveStyle({ backgroundColor: '#ff0000' });
   });
@@ -133,11 +133,11 @@ describe('ColorPicker', () => {
     const user = userEvent.setup();
     render(<ColorPicker {...defaultProps} />);
 
-    const preview = screen.getByRole('button', { name: /color preview/i });
+    const preview = screen.getByRole('button', { name: /open color picker/i });
     await user.click(preview);
 
-    // Preview click should focus the input
-    const input = screen.getByRole('textbox', { name: /color/i });
-    expect(input).toHaveFocus();
+    // Preview click should open the color picker (showPicker becomes true)
+    // We can verify this by checking that the picker content is now visible
+    expect(screen.getByText('Choose a color')).toBeInTheDocument();
   });
 });

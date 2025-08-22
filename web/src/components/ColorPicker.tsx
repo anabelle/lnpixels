@@ -6,12 +6,20 @@ interface ColorPickerProps {
   className?: string;
 }
 
+const PRESET_COLORS = [
+  '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4',
+  '#3b82f6', '#8b5cf6', '#ec4899', '#f43f5e', '#84cc16',
+  '#10b981', '#14b8a6', '#0ea5e9', '#6366f1', '#a855f7',
+  '#f59e0b', '#000000', '#ffffff'
+];
+
 const ColorPicker: React.FC<ColorPickerProps> = ({
   color,
   onColorChange,
   className = ''
 }) => {
   const [inputValue, setInputValue] = useState(color);
+  const [showPicker, setShowPicker] = useState(false);
   const [isValid, setIsValid] = useState(true);
 
   // Update input value when color prop changes
@@ -61,10 +69,19 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
     }
   };
 
-  const handlePreviewClick = () => {
-    // Focus the input when preview is clicked
-    const input = document.getElementById('color-input');
-    input?.focus();
+  const handleColorSelect = (selectedColor: string) => {
+    onColorChange(selectedColor);
+    setShowPicker(false);
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      const normalizedColor = normalizeHexColor(inputValue);
+      if (normalizedColor.length === 7) {
+        onColorChange(normalizedColor);
+        setShowPicker(false);
+      }
+    }
   };
 
   return (
@@ -73,19 +90,19 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
         <div className="color-preview-container">
           <button
             type="button"
-            className="color-preview"
-            style={{ backgroundColor: isValid ? color : '#cccccc' }}
-            onClick={handlePreviewClick}
-            aria-label="Color preview - click to edit"
-            title="Click to edit color"
+            className="color-preview-button"
+            style={{ backgroundColor: color }}
+            onClick={() => setShowPicker(!showPicker)}
+            aria-label="Open color picker"
+            title="Click to choose color"
           />
         </div>
         <div className="color-input-container">
           <input
-            id="color-input"
             type="text"
             value={inputValue}
             onChange={handleInputChange}
+            onKeyDown={handleInputKeyDown}
             className={`color-input ${!isValid ? 'invalid' : ''}`}
             placeholder="#RRGGBB"
             aria-label="Color (hex code)"
@@ -97,6 +114,64 @@ const ColorPicker: React.FC<ColorPickerProps> = ({
           />
         </div>
       </div>
+
+      {showPicker && (
+        <div className="color-picker-popover">
+          <div className="color-picker-content">
+            <div className="color-picker-header">
+              <h4 className="color-picker-title">Choose a color</h4>
+              <p className="color-picker-description">
+                Pick from presets or enter a hex code
+              </p>
+            </div>
+
+            <div className="color-picker-body">
+              <div className="color-input-section">
+                <label htmlFor="hex-input" className="color-input-label">
+                  Hex Color
+                </label>
+                <div className="color-input-row">
+                  <input
+                    id="hex-input"
+                    type="text"
+                    value={inputValue}
+                    onChange={handleInputChange}
+                    onKeyDown={handleInputKeyDown}
+                    placeholder="#000000"
+                    className="color-hex-input"
+                    maxLength={7}
+                  />
+                  <div
+                    className="color-preview-small"
+                    style={{
+                      backgroundColor: isValidHexColor(inputValue)
+                        ? normalizeHexColor(inputValue)
+                        : '#ffffff'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="color-presets-section">
+                <label className="color-presets-label">Presets</label>
+                <div className="color-presets-grid">
+                  {PRESET_COLORS.map((presetColor) => (
+                    <button
+                      key={presetColor}
+                      className="color-preset-button"
+                      style={{ backgroundColor: presetColor }}
+                      onClick={() => handleColorSelect(presetColor)}
+                      title={presetColor}
+                      aria-label={`Select color ${presetColor}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div id="color-help" className="color-help">
         Enter a hex color code (e.g., #FF0000 or #f00)
       </div>
