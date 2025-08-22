@@ -1,17 +1,22 @@
 import React from 'react';
+import ColorPicker from './ColorPicker';
+import { usePixelPurchase } from '../hooks/usePixelPurchase';
 
 interface PurchasePanelProps {
   collapsed?: boolean;
   onToggle?: () => void;
 }
 
-const PurchasePanel: React.FC<PurchasePanelProps> = ({ collapsed, onToggle }) => (
-  <aside
-    className={`purchase-panel ${collapsed ? 'collapsed' : ''}`}
-    role="complementary"
-    aria-label="Purchase panel"
-    onClick={collapsed ? onToggle : undefined}
-  >
+const PurchasePanel: React.FC<PurchasePanelProps> = ({ collapsed, onToggle }) => {
+  const { state, setPixelType, setColor, setLetter, isValid, getDisplayPrice } = usePixelPurchase();
+
+  return (
+    <aside
+      className={`purchase-panel ${collapsed ? 'collapsed' : ''}`}
+      role="complementary"
+      aria-label="Purchase panel"
+      onClick={collapsed ? onToggle : undefined}
+    >
     <div className="panel-header" onClick={collapsed ? onToggle : undefined}>
       <h3>Pixel Purchase</h3>
       {onToggle && !collapsed && (
@@ -29,17 +34,61 @@ const PurchasePanel: React.FC<PurchasePanelProps> = ({ collapsed, onToggle }) =>
       <>
         <div className="panel-section">
           <div className="pixel-type-selector" role="radiogroup" aria-label="Pixel type selection">
-            <button className="type-button active" role="radio" aria-checked="true" aria-label="Basic pixel for 1 satoshi">
-              Basic (1 sat)
+            <button
+              className={`type-button ${state.type === 'basic' ? 'active' : ''}`}
+              role="radio"
+              aria-checked={state.type === 'basic'}
+              aria-label="Basic pixel for 1 satoshi"
+              onClick={() => setPixelType('basic')}
+            >
+              Basic ({getDisplayPrice()})
             </button>
-            <button className="type-button" role="radio" aria-checked="false" aria-label="Color pixel for 10 satoshis">
-              Color (10 sats)
+            <button
+              className={`type-button ${state.type === 'color' ? 'active' : ''}`}
+              role="radio"
+              aria-checked={state.type === 'color'}
+              aria-label="Color pixel for 10 satoshis"
+              onClick={() => setPixelType('color')}
+            >
+              Color ({getDisplayPrice()})
             </button>
-            <button className="type-button" role="radio" aria-checked="false" aria-label="Color plus letter pixel for 100 satoshis">
-              Color + Letter (100 sats)
+            <button
+              className={`type-button ${state.type === 'letter' ? 'active' : ''}`}
+              role="radio"
+              aria-checked={state.type === 'letter'}
+              aria-label="Color plus letter pixel for 100 satoshis"
+              onClick={() => setPixelType('letter')}
+            >
+              Color + Letter ({getDisplayPrice()})
             </button>
           </div>
         </div>
+
+        {(state.type === 'color' || state.type === 'letter') && (
+          <div className="panel-section">
+            <h4>Choose Color</h4>
+            <ColorPicker
+              color={state.color}
+              onColorChange={setColor}
+              className="purchase-color-picker"
+            />
+          </div>
+        )}
+
+        {state.type === 'letter' && (
+          <div className="panel-section">
+            <h4>Letter</h4>
+            <input
+              type="text"
+              maxLength={1}
+              value={state.letter}
+              onChange={(e) => setLetter(e.target.value)}
+              placeholder="A"
+              className="letter-input"
+              aria-label="Single letter for pixel"
+            />
+          </div>
+        )}
 
         <div className="panel-section">
           <h4>Selected Pixels</h4>
@@ -56,16 +105,28 @@ const PurchasePanel: React.FC<PurchasePanelProps> = ({ collapsed, onToggle }) =>
         </div>
 
         <div className="panel-section">
-          <button className="purchase-button" disabled aria-describedby="purchase-status">
+          <div className="price-display">
+            <span className="price-label">Price:</span>
+            <span className="price-value">{getDisplayPrice()}</span>
+          </div>
+          <button
+            className="purchase-button"
+            disabled={!isValid()}
+            aria-describedby="purchase-status"
+          >
             Generate Invoice
           </button>
           <div id="purchase-status" className="sr-only">
-            No pixels selected. Please select pixels to generate an invoice.
+            {!isValid()
+              ? 'Please select a valid color and letter (if required).'
+              : 'Ready to generate invoice.'
+            }
           </div>
         </div>
       </>
     )}
   </aside>
-);
+  );
+};
 
 export default PurchasePanel;
