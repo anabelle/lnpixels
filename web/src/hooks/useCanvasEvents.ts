@@ -5,6 +5,7 @@ interface UseCanvasEventsProps {
   viewport: Viewport;
   pan: (deltaX: number, deltaY: number) => void;
   zoom: (zoomFactor: number) => void;
+  setZoom?: (newZoom: number) => void;
   screenToWorld: (screenX: number, screenY: number) => { x: number; y: number };
   onPixelSelect?: (x: number, y: number) => void;
 }
@@ -13,6 +14,7 @@ export const useCanvasEvents = ({
   viewport,
   pan,
   zoom,
+  setZoom,
   screenToWorld,
   onPixelSelect,
 }: UseCanvasEventsProps) => {
@@ -90,8 +92,15 @@ export const useCanvasEvents = ({
       const distance = getTouchDistance(e.touches[0], e.touches[1]);
       const zoomRatio = distance / initialPinchDistance;
       const newZoom = initialPinchZoom * zoomRatio;
-      // Note: We would need to pass setZoom here, but for now we'll use the zoom function
-      // This is a simplified version
+      
+      // Apply the new zoom level
+      if (setZoom) {
+        setZoom(newZoom);
+      } else {
+        // Fallback to zoom factor approach
+        const zoomFactor = newZoom / viewport.zoom;
+        zoom(zoomFactor);
+      }
     } else if (isPanning && e.touches.length === 1) {
       // Handle single touch pan
       e.preventDefault();

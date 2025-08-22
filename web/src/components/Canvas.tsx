@@ -39,7 +39,7 @@ const Canvas: React.FC<ExtendedCanvasProps> = ({
   const { selectionState, selectSinglePixel, selectRectangle, clearSelection } = useSelectionState();
 
   // Use shared viewport context
-  const { viewport, pan, zoom } = useViewportContext();
+  const { viewport, pan, zoom, setZoom } = useViewportContext();
   const { screenToWorld, worldToScreen } = useCanvasCoordinates(canvasRef, viewport, dimensions);
 
   // Custom pixel selection handler with validation and rectangle selection
@@ -140,6 +140,7 @@ const Canvas: React.FC<ExtendedCanvasProps> = ({
     viewport,
     pan,
     zoom,
+    setZoom,
     screenToWorld,
     onPixelSelect: (x, y) => {
       // Handle single pixel selection through the original system
