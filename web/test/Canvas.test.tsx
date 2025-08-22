@@ -87,12 +87,21 @@ describe('Canvas', () => {
     expect(canvas).toBeInTheDocument();
   });
 
-  it('should handle wheel events for zooming', () => {
+  it('should handle wheel events for zooming in', () => {
     render(<Canvas />);
     const canvas = screen.getByRole('img', { hidden: true });
 
     fireEvent.wheel(canvas, { deltaY: -100 }); // Zoom in
-    // Should increase zoom level
+    // Should zoom in (increase zoom level)
+    expect(canvas).toBeInTheDocument();
+  });
+
+  it('should handle wheel events for zooming out', () => {
+    render(<Canvas />);
+    const canvas = screen.getByRole('img', { hidden: true });
+
+    fireEvent.wheel(canvas, { deltaY: 100 }); // Zoom out
+    // Should zoom out (decrease zoom level)
     expect(canvas).toBeInTheDocument();
   });
 
@@ -138,16 +147,60 @@ describe('Canvas', () => {
     expect(canvas).toBeInTheDocument();
   });
 
-  it('should handle touch events for mobile', () => {
+  it('should handle touch events for mobile panning', () => {
     render(<Canvas />);
     const canvas = screen.getByRole('img', { hidden: true });
 
-    // Simulate touch events
+    // Simulate touch events for panning
     fireEvent.touchStart(canvas, {
       touches: [{ clientX: 100, clientY: 100 }]
     });
     fireEvent.touchMove(canvas, {
       touches: [{ clientX: 150, clientY: 150 }]
+    });
+    fireEvent.touchEnd(canvas);
+
+    expect(canvas).toBeInTheDocument();
+  });
+
+  it('should handle pinch gestures for zooming', () => {
+    render(<Canvas />);
+    const canvas = screen.getByRole('img', { hidden: true });
+
+    // Simulate pinch to zoom in (two fingers moving apart)
+    fireEvent.touchStart(canvas, {
+      touches: [
+        { clientX: 100, clientY: 100 },
+        { clientX: 200, clientY: 100 }
+      ]
+    });
+    fireEvent.touchMove(canvas, {
+      touches: [
+        { clientX: 80, clientY: 100 },
+        { clientX: 220, clientY: 100 }
+      ]
+    });
+    fireEvent.touchEnd(canvas);
+
+    expect(canvas).toBeInTheDocument();
+  });
+
+  it('should handle pinch gestures for zooming out', () => {
+    render(<Canvas />);
+    const canvas = screen.getByRole('img', { hidden: true });
+
+    // Simulate pinch to zoom out (two fingers moving together)
+    fireEvent.touchStart(canvas, {
+      touches: [
+        { clientX: 80, clientY: 100 },
+        { clientX: 220, clientY: 100 }
+      ]
+    });
+    fireEvent.touchMove(canvas, {
+      touches: [
+        { clientX: 100, clientY: 100 },
+        { clientX: 200, clientY: 100 }
+      ]
     });
     fireEvent.touchEnd(canvas);
 

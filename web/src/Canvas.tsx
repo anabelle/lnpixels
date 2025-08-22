@@ -35,12 +35,24 @@ const Canvas: React.FC<CanvasProps> = ({
     y: 0,
     zoom: PIXEL_SIZE, // Always maintain fixed pixel size
   });
+
+  // Helper function to calculate distance between two touch points
+  const getTouchDistance = (touch1: Touch, touch2: Touch): number => {
+    const dx = touch1.clientX - touch2.clientX;
+    const dy = touch1.clientY - touch2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
   const [isPanning, setIsPanning] = useState(false);
   const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [isPinching, setIsPinching] = useState(false);
+  const [initialPinchDistance, setInitialPinchDistance] = useState(0);
+  const [initialPinchZoom, setInitialPinchZoom] = useState(PIXEL_SIZE);
   const [isLayoutChanging, setIsLayoutChanging] = useState(false);
 
-  // No zoom limits needed - pixel size is fixed
+  // Zoom limits for user-controlled zoom
+  const MIN_ZOOM = 5;
+  const MAX_ZOOM = 100;
 
   // Handle canvas resize with stable pixel size
   useEffect(() => {
@@ -174,11 +186,11 @@ const Canvas: React.FC<CanvasProps> = ({
 
     // Draw coordinates in corner
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(10, 10, 100, 30);
+    ctx.fillRect(10, 10, 120, 40);
     ctx.fillStyle = '#ffffff';
     ctx.font = '12px Arial';
     ctx.fillText(`X: ${Math.floor(viewport.x)}, Y: ${Math.floor(viewport.y)}`, 15, 25);
-    ctx.fillText(`Pixel Size: ${PIXEL_SIZE}px`, 15, 40);
+    ctx.fillText(`Zoom: ${viewport.zoom.toFixed(1)}x`, 15, 40);
 
     // Show layout changing indicator
     if (isLayoutChanging) {
@@ -236,16 +248,31 @@ const Canvas: React.FC<CanvasProps> = ({
 
   // No double-click needed - pixel size is always fixed
 
-  // No wheel zoom - pixel size is fixed
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    // Pixel size remains fixed - no zooming allowed
+
+    // Smooth zoom with wheel
+    const zoomFactor = e.deltaY > 0 ? 0.95 : 1.05;
+    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, viewport.zoom * zoomFactor));
+
+    setViewport(prev => ({
+      ...prev,
+      zoom: newZoom,
+    }));
   };
 
   // Touch event handlers for mobile
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (e.touches.length === 1) {
+    if (e.touches.length === 2) {
+      // Start pinch gesture
+      e.preventDefault();
+      setIsPinching(true);
+      const distance = getTouchDistance(e.touches[0], e.touches[1]);
+      setInitialPinchDistance(distance);
+      setInitialPinchZoom(viewport.zoom);
+    } else if (e.touches.length === 1 && !isPinching) {
+      // Start single touch pan
       setIsPanning(true);
       setLastMousePos({
         x: e.touches[0].clientX,
@@ -255,7 +282,19 @@ const Canvas: React.FC<CanvasProps> = ({
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (isPanning && e.touches.length === 1) {
+    if (e.touches.length === 2 && isPinching) {
+      // Handle pinch zoom
+      e.preventDefault();
+      const distance = getTouchDistance(e.touches[0], e.touches[1]);
+      const zoomRatio = distance / initialPinchDistance;
+      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, initialPinchZoom * zoomRatio));
+
+      setViewport(prev => ({
+        ...prev,
+        zoom: newZoom,
+      }));
+    } else if (isPanning && e.touches.length === 1) {
+      // Handle single touch pan
       e.preventDefault();
       const deltaX = e.touches[0].clientX - lastMousePos.x;
       const deltaY = e.touches[0].clientY - lastMousePos.y;
@@ -275,6 +314,7 @@ const Canvas: React.FC<CanvasProps> = ({
 
   const handleTouchEnd = () => {
     setIsPanning(false);
+    setIsPinching(false);
   };
 
   return (
