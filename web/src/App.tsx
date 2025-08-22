@@ -7,7 +7,7 @@ import PurchasePanel from './components/PurchasePanel';
 import ActivityFeed from './components/ActivityFeed';
 import MobileTabs from './components/MobileTabs';
 import { Pixel } from './types/canvas';
-import { useViewportWithUrl } from './hooks/useViewportWithUrl';
+import { ViewportProvider, useViewportContext } from './contexts/ViewportContext';
 
 
 
@@ -26,8 +26,8 @@ function AppContent() {
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const [selectedPixel, setSelectedPixel] = useState<{ x: number; y: number } | null>(null);
 
-  // Get viewport state for header display
-  const { viewport } = useViewportWithUrl();
+  // Get viewport state from context
+  const { viewport, urlState } = useViewportContext();
 
   // Sample pixels for demonstration
   const samplePixels = [
@@ -58,7 +58,7 @@ function AppContent() {
 
   return (
     <div className="app">
-      <Header viewport={viewport} />
+      <Header urlState={urlState} />
 
       <div className={`main-layout ${leftPanelCollapsed ? 'left-collapsed' : ''} ${rightPanelCollapsed ? 'right-collapsed' : ''}`}>
         {!isMobile && (
@@ -107,7 +107,9 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <ViewportProvider>
+        <AppContent />
+      </ViewportProvider>
     </ThemeProvider>
   );
 }

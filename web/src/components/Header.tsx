@@ -2,14 +2,14 @@ import React from 'react';
 import { useTheme } from '../theme';
 
 interface HeaderProps {
-  viewport?: {
+  urlState?: {
     x: number;
     y: number;
-    zoom: number;
+    z: number;
   };
 }
 
-const Header: React.FC<HeaderProps> = ({ viewport }) => {
+const Header: React.FC<HeaderProps> = ({ urlState }) => {
   const { actualTheme, toggleTheme } = useTheme();
 
   // Format coordinates and zoom for display
@@ -18,13 +18,14 @@ const Header: React.FC<HeaderProps> = ({ viewport }) => {
   };
 
   const formatZoom = (zoom: number): string => {
+    // URL zoom (1-10) directly converts to percentage
     return `${Math.round(zoom * 100)}%`;
   };
 
-  // Use actual viewport values or defaults
-  const displayX = viewport?.x ?? 0;
-  const displayY = viewport?.y ?? 0;
-  const displayZoom = viewport?.zoom ?? 1;
+  // Use actual URL state values or defaults
+  const displayX = urlState?.x ?? 0;
+  const displayY = urlState?.y ?? 0;
+  const displayZoom = urlState?.z ?? 1;
 
   return (
     <header className="header" role="banner">

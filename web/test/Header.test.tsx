@@ -4,7 +4,7 @@ import Header from '../src/components/Header';
 import { ThemeProvider } from '../src/theme';
 
 describe('Header', () => {
-  const renderHeader = (props?: { viewport?: { x: number; y: number; zoom: number } }) => {
+  const renderHeader = (props?: { urlState?: { x: number; y: number; z: number } }) => {
     return render(
       <ThemeProvider>
         <Header {...props} />
@@ -39,33 +39,33 @@ describe('Header', () => {
     expect(screen.getByLabelText('Current zoom level')).toHaveTextContent('100%');
   });
 
-  it('should display actual coordinates when viewport provided', () => {
-    renderHeader({ viewport: { x: 100, y: 200, zoom: 2 } });
+  it('should display actual coordinates when urlState provided', () => {
+    renderHeader({ urlState: { x: 100, y: 200, z: 2 } });
     expect(screen.getByLabelText('Current coordinates')).toHaveTextContent('100, 200');
   });
 
-  it('should display actual zoom level when viewport provided', () => {
-    renderHeader({ viewport: { x: 0, y: 0, zoom: 2 } });
+  it('should display actual zoom level when urlState provided', () => {
+    renderHeader({ urlState: { x: 0, y: 0, z: 2 } });
     expect(screen.getByLabelText('Current zoom level')).toHaveTextContent('200%');
   });
 
   it('should handle fractional coordinates correctly', () => {
-    renderHeader({ viewport: { x: 100.7, y: 200.3, zoom: 1.5 } });
+    renderHeader({ urlState: { x: 100.7, y: 200.3, z: 1.5 } });
     expect(screen.getByLabelText('Current coordinates')).toHaveTextContent('101, 200');
   });
 
   it('should handle fractional zoom correctly', () => {
-    renderHeader({ viewport: { x: 0, y: 0, zoom: 1.234 } });
+    renderHeader({ urlState: { x: 0, y: 0, z: 1.234 } });
     expect(screen.getByLabelText('Current zoom level')).toHaveTextContent('123%');
   });
 
   it('should handle negative coordinates', () => {
-    renderHeader({ viewport: { x: -50, y: -25, zoom: 1 } });
+    renderHeader({ urlState: { x: -50, y: -25, z: 1 } });
     expect(screen.getByLabelText('Current coordinates')).toHaveTextContent('-50, -25');
   });
 
   it('should handle zoom less than 1', () => {
-    renderHeader({ viewport: { x: 0, y: 0, zoom: 0.5 } });
+    renderHeader({ urlState: { x: 0, y: 0, z: 0.5 } });
     expect(screen.getByLabelText('Current zoom level')).toHaveTextContent('50%');
   });
 

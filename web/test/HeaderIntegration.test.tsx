@@ -12,16 +12,16 @@ describe('Header Integration', () => {
     );
   };
 
-  it('should update coordinates when viewport changes', () => {
-    const { rerender } = renderHeader({ x: 0, y: 0, zoom: 1 });
+  it('should update coordinates when urlState changes', () => {
+    const { rerender } = renderHeader({ x: 0, y: 0, z: 1 });
 
     expect(screen.getByLabelText('Current coordinates')).toHaveTextContent('0, 0');
     expect(screen.getByLabelText('Current zoom level')).toHaveTextContent('100%');
 
-    // Update viewport
+    // Update urlState
     rerender(
       <ThemeProvider>
-        <Header viewport={{ x: 100, y: 200, zoom: 2 }} />
+        <Header urlState={{ x: 100, y: 200, z: 2 }} />
       </ThemeProvider>
     );
 
@@ -29,7 +29,7 @@ describe('Header Integration', () => {
     expect(screen.getByLabelText('Current zoom level')).toHaveTextContent('200%');
   });
 
-  it('should handle viewport state transitions correctly', () => {
+  it('should handle urlState transitions correctly', () => {
     const { rerender } = renderHeader();
 
     // Start with default
@@ -38,7 +38,7 @@ describe('Header Integration', () => {
     // Change to specific coordinates
     rerender(
       <ThemeProvider>
-        <Header viewport={{ x: -50, y: 75, zoom: 0.5 }} />
+        <Header urlState={{ x: -50, y: 75, z: 0.5 }} />
       </ThemeProvider>
     );
 
@@ -48,7 +48,7 @@ describe('Header Integration', () => {
     // Change back to center
     rerender(
       <ThemeProvider>
-        <Header viewport={{ x: 0, y: 0, zoom: 1 }} />
+        <Header urlState={{ x: 0, y: 0, z: 1 }} />
       </ThemeProvider>
     );
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Canvas from '../src/components/Canvas';
+import { ViewportProvider } from '../src/contexts/ViewportContext';
 
 // Mock the canvas element and its context
 const mockCanvas = {
@@ -44,22 +45,30 @@ describe('Canvas', () => {
     vi.clearAllMocks();
   });
 
+  const renderCanvas = (props?: any) => {
+    return render(
+      <ViewportProvider>
+        <Canvas {...props} />
+      </ViewportProvider>
+    );
+  };
+
   it('should render canvas element', () => {
-    render(<Canvas />);
+    renderCanvas();
     const canvasElement = screen.getByRole('img', { hidden: true });
     expect(canvasElement).toBeInTheDocument();
     expect(canvasElement.tagName).toBe('CANVAS');
   });
 
   it('should have proper accessibility attributes', () => {
-    render(<Canvas />);
+    renderCanvas();
     const canvas = screen.getByRole('img', { hidden: true });
     expect(canvas).toHaveAttribute('aria-label', 'Pixel canvas');
     expect(canvas).toHaveAttribute('role', 'img');
   });
 
   it('should handle mouse down events for panning', () => {
-    render(<Canvas />);
+    renderCanvas();
     const canvas = screen.getByRole('img', { hidden: true });
 
     fireEvent.mouseDown(canvas, { clientX: 100, clientY: 100 });
@@ -68,7 +77,7 @@ describe('Canvas', () => {
   });
 
   it('should handle mouse move events during panning', () => {
-    render(<Canvas />);
+    renderCanvas();
     const canvas = screen.getByRole('img', { hidden: true });
 
     fireEvent.mouseDown(canvas, { clientX: 100, clientY: 100 });
@@ -78,7 +87,7 @@ describe('Canvas', () => {
   });
 
   it('should handle mouse up events to stop panning', () => {
-    render(<Canvas />);
+    renderCanvas();
     const canvas = screen.getByRole('img', { hidden: true });
 
     fireEvent.mouseDown(canvas, { clientX: 100, clientY: 100 });
@@ -88,7 +97,7 @@ describe('Canvas', () => {
   });
 
   it('should handle wheel events for zooming in', () => {
-    render(<Canvas />);
+    renderCanvas();
     const canvas = screen.getByRole('img', { hidden: true });
 
     fireEvent.wheel(canvas, { deltaY: -100 }); // Zoom in
@@ -97,7 +106,7 @@ describe('Canvas', () => {
   });
 
   it('should handle wheel events for zooming out', () => {
-    render(<Canvas />);
+    renderCanvas();
     const canvas = screen.getByRole('img', { hidden: true });
 
     fireEvent.wheel(canvas, { deltaY: 100 }); // Zoom out
@@ -107,7 +116,7 @@ describe('Canvas', () => {
 
   it('should handle click events for pixel selection', () => {
     const mockOnPixelSelect = vi.fn();
-    render(<Canvas onPixelSelect={mockOnPixelSelect} />);
+    renderCanvas({ onPixelSelect: mockOnPixelSelect });
     const canvas = screen.getByRole('img', { hidden: true });
 
     fireEvent.click(canvas, { clientX: 400, clientY: 300 });
@@ -122,14 +131,14 @@ describe('Canvas', () => {
       { x: 0, y: 1, color: '#0000ff' },
     ];
 
-    render(<Canvas pixels={pixels} />);
+    renderCanvas({ pixels });
     const canvas = screen.getByRole('img', { hidden: true });
     expect(canvas).toBeInTheDocument();
     // Canvas should attempt to render the pixels
   });
 
   it('should handle coordinate transformations', () => {
-    render(<Canvas />);
+    renderCanvas();
     const canvas = screen.getByRole('img', { hidden: true });
 
     // Test that coordinate transformations work
@@ -138,7 +147,7 @@ describe('Canvas', () => {
   });
 
   it('should respect zoom limits', () => {
-    render(<Canvas />);
+    renderCanvas();
     const canvas = screen.getByRole('img', { hidden: true });
 
     // Test minimum and maximum zoom levels
@@ -148,7 +157,7 @@ describe('Canvas', () => {
   });
 
   it('should handle touch events for mobile panning', () => {
-    render(<Canvas />);
+    renderCanvas();
     const canvas = screen.getByRole('img', { hidden: true });
 
     // Simulate touch events for panning
@@ -164,7 +173,7 @@ describe('Canvas', () => {
   });
 
   it('should handle pinch gestures for zooming', () => {
-    render(<Canvas />);
+    renderCanvas();
     const canvas = screen.getByRole('img', { hidden: true });
 
     // Simulate pinch to zoom in (two fingers moving apart)
@@ -186,7 +195,7 @@ describe('Canvas', () => {
   });
 
   it('should handle pinch gestures for zooming out', () => {
-    render(<Canvas />);
+    renderCanvas();
     const canvas = screen.getByRole('img', { hidden: true });
 
     // Simulate pinch to zoom out (two fingers moving together)
