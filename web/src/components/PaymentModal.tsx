@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NakaPayModal } from 'nakapay-react';
 import { SelectionState } from '../hooks/usePixelPurchase';
+import { io, Socket } from 'socket.io-client';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -29,6 +30,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const [payment, setPayment] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   console.log('PaymentModal render:', { isOpen, selectionState, pixelType, color, letter });
   console.log('PaymentModal render check:', { isOpen, isLoading, payment: !!payment });
@@ -153,6 +156,57 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     console.log('handleClose completed');
   };
 
+  // Setup WebSocket connection for payment confirmations
+  useEffect(() => {
+    if (isOpen) {
+      console.log('Setting up WebSocket connection for payment monitoring');
+      const newSocket = io('/', {
+        path: '/api/socket.io',
+        transports: ['websocket', 'polling']
+      });
+
+      newSocket.on('connect', () => {
+        console.log('PaymentModal connected to WebSocket');
+      });
+
+      newSocket.on('pixel.update', (updatedPixel: any) => {
+        console.log('PaymentModal received pixel update:', updatedPixel);
+
+        // Check if this update matches our current payment
+        if (payment && (
+          (selectionState.selectedPixels?.length === 1 &&
+           updatedPixel.x === selectionState.selectedPixels[0].x &&
+           updatedPixel.y === selectionState.selectedPixels[0].y) ||
+          (selectionState.selectedRectangle &&
+           updatedPixel.x >= selectionState.selectedRectangle.x1 &&
+           updatedPixel.x <= selectionState.selectedRectangle.x2 &&
+           updatedPixel.y >= selectionState.selectedRectangle.y1 &&
+           updatedPixel.y <= selectionState.selectedRectangle.y2)
+        )) {
+          console.log('Payment confirmed! Pixel updated successfully');
+          setPaymentSuccess(true);
+
+          // Auto-close after showing success for 3 seconds
+          setTimeout(() => {
+            handlePaymentSuccess(updatedPixel);
+          }, 3000);
+        }
+      });
+
+      newSocket.on('connect_error', (error) => {
+        console.error('PaymentModal WebSocket connection error:', error);
+      });
+
+      setSocket(newSocket);
+
+      return () => {
+        console.log('Cleaning up PaymentModal WebSocket connection');
+        newSocket.disconnect();
+        setSocket(null);
+      };
+    }
+  }, [isOpen, payment, selectionState]);
+
   // Auto-create payment when modal opens
   React.useEffect(() => {
     console.log('PaymentModal useEffect:', { isOpen, payment, isLoading });
@@ -160,12 +214,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       // Always reset and create new payment when modal opens
       console.log('Modal opened, resetting and creating new payment');
       setPayment(null);
+      setPaymentSuccess(false);
       setIsLoading(true);
       handleCreatePayment();
     } else {
       // Reset state when modal closes
       console.log('Modal closed, resetting state');
       setPayment(null);
+      setPaymentSuccess(false);
       setIsLoading(false);
     }
   }, [isOpen]);
@@ -186,6 +242,80 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
             <div className="loading-state">
               <div className="spinner"></div>
               <p>Creating invoice...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show success state when payment is confirmed
+  if (paymentSuccess) {
+    console.log('PaymentModal showing success state');
+    return (
+      <div
+        className="payment-modal-overlay"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}
+      >
+        <div
+          className="payment-modal"
+          style={{
+            background: 'white',
+            borderRadius: '12px',
+            padding: '2rem',
+            maxWidth: '400px',
+            width: '90%',
+            textAlign: 'center',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, 0.3)'
+          }}
+        >
+          <div className="payment-modal-content">
+            <div
+              className="success-state"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '1rem'
+              }}
+            >
+              <div
+                className="success-icon"
+                style={{
+                  fontSize: '3rem',
+                  animation: 'bounce 0.6s ease-in-out'
+                }}
+              >
+                ✅
+              </div>
+              <h3 style={{ margin: 0, color: '#28a745', fontSize: '1.5rem' }}>
+                Payment Successful!
+              </h3>
+              <p style={{ margin: 0, color: '#666', fontSize: '1rem' }}>
+                Your pixel purchase has been completed successfully.
+              </p>
+              <p
+                className="success-note"
+                style={{
+                  margin: '0.5rem 0 0 0',
+                  color: '#888',
+                  fontSize: '0.9rem',
+                  fontStyle: 'italic'
+                }}
+              >
+                Modal will close automatically in a few seconds...
+              </p>
             </div>
           </div>
         </div>
