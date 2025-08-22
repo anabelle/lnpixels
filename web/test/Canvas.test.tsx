@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import Canvas from '../src/Canvas';
+import Canvas from '../src/components/Canvas';
 
 // Mock the canvas element and its context
 const mockCanvas = {
