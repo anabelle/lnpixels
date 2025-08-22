@@ -6,7 +6,14 @@ import { setupRoutes } from './routes';
 const app = express();
 
 // Middleware to parse JSON request bodies
-app.use(express.json());
+app.use(express.json({
+  verify: (req: any, res, buf) => {
+    // Capture raw body for webhook signature verification
+    if (req.url === '/api/nakapay') {
+      req.rawBody = buf.toString();
+    }
+  }
+}));
 
 // Setup Socket.IO
 const { server, io } = setupSocket(app);

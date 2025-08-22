@@ -3,6 +3,9 @@ import { Server as SocketServer } from 'socket.io';
 import { PaymentsAdapter, NakaPayAdapter, MockPaymentsAdapter } from './payments.js';
 import { price } from './pricing.js';
 
+// Track processed payment IDs for idempotency
+const processedPayments = new Set<string>();
+
 const router = Router();
 
 // In-memory storage for pixels (will be replaced with database later)
@@ -38,7 +41,7 @@ export function setupRoutes(io: SocketServer) {
       'GET /api/pixels': 'Get pixels within a rectangle',
       'POST /api/invoices': 'Create invoice for pixel purchase',
       'POST /api/invoices/bulk': 'Create bulk invoice for rectangle purchase',
-      'POST /api/payments/webhook': 'Payment webhook',
+      'POST /api/nakapay': 'NakaPay webhook',
       'GET /api/activity': 'Get activity feed',
       'GET /api/verify/:eventId': 'Verify event'
     }
@@ -52,7 +55,7 @@ export function setupRoutes(io: SocketServer) {
       'GET /api/pixels': 'Get pixels within a rectangle',
       'POST /api/invoices': 'Create invoice for pixel purchase',
       'POST /api/invoices/bulk': 'Create bulk invoice for rectangle purchase',
-      'POST /api/payments/webhook': 'Payment webhook',
+      'POST /api/nakapay': 'NakaPay webhook',
       'GET /api/activity': 'Get activity feed',
       'GET /api/verify/:eventId': 'Verify event'
     }
@@ -188,19 +191,38 @@ export function setupRoutes(io: SocketServer) {
     }
   });
 
-  // POST /payments/webhook - Handle payment webhooks
-  router.post('/payments/webhook', (req, res) => {
+  // POST /nakapay - Handle NakaPay webhooks
+  router.post('/nakapay', (req, res) => {
     try {
       const signature = req.headers['x-nakapay-signature'] as string;
-      const payload = req.body;
+      const rawBody = (req as any).rawBody;
+
+      if (!rawBody) {
+        return res.status(400).json({ error: 'Missing raw body' });
+      }
 
       // Verify webhook signature
-      if (!paymentsAdapter.verifyWebhook(payload, signature)) {
+      if (!paymentsAdapter.verifyWebhook(rawBody, signature)) {
+        return res.status(401).json({ error: 'Invalid signature' });
+      }
+
+      const payload = JSON.parse(rawBody);
+
+      // Verify webhook signature
+      if (!paymentsAdapter.verifyWebhook(rawBody, signature)) {
         return res.status(401).json({ error: 'Invalid signature' });
       }
 
       // Handle payment completion
       if (payload.event === 'payment.completed') {
+        const paymentId = payload.payment_id;
+
+        // Check for idempotency
+        if (processedPayments.has(paymentId)) {
+          console.log(`Payment ${paymentId} already processed, skipping`);
+          return res.json({ success: true, message: 'Already processed' });
+        }
+
         const metadata = payload.metadata;
 
         if (metadata.pixelUpdates) {
@@ -254,6 +276,9 @@ export function setupRoutes(io: SocketServer) {
           timestamp: Date.now(),
           metadata
         });
+
+        // Mark payment as processed for idempotency
+        processedPayments.add(paymentId);
       }
 
       res.json({ success: true });

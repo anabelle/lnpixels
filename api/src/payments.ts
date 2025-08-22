@@ -1,4 +1,5 @@
 import { NakaPay } from 'nakapay-sdk';
+import crypto from 'crypto';
 
 export interface PaymentsAdapter {
   createInvoice(amount: number, description: string, metadata?: any): Promise<{
@@ -6,7 +7,7 @@ export interface PaymentsAdapter {
     invoice: string;
     payment_hash: string;
   }>;
-  verifyWebhook(payload: any, signature: string): boolean;
+  verifyWebhook(rawBody: string, signature: string): boolean;
 }
 
 export class NakaPayAdapter implements PaymentsAdapter {
@@ -44,10 +45,32 @@ export class NakaPayAdapter implements PaymentsAdapter {
     }
   }
 
-  verifyWebhook(payload: any, signature: string): boolean {
-    // TODO: Implement webhook signature verification
-    // This should verify the webhook signature from NakaPay
-    return true; // Placeholder
+  verifyWebhook(rawBody: string, signature: string): boolean {
+    const secret = process.env.NAKAPAY_WEBHOOK_SECRET;
+    if (!secret) {
+      console.error('NAKAPAY_WEBHOOK_SECRET environment variable is required');
+      return false;
+    }
+
+    try {
+      const expectedSignature = crypto
+        .createHmac('sha256', secret)
+        .update(rawBody)
+        .digest('hex');
+
+      // Check if signatures have the same length before using timingSafeEqual
+      if (signature.length !== expectedSignature.length) {
+        return false;
+      }
+
+      return crypto.timingSafeEqual(
+        Buffer.from(signature, 'hex'),
+        Buffer.from(expectedSignature, 'hex')
+      );
+    } catch (error) {
+      console.error('Error verifying webhook signature:', error);
+      return false;
+    }
   }
 }
 
@@ -61,7 +84,7 @@ export class MockPaymentsAdapter implements PaymentsAdapter {
     };
   }
 
-  verifyWebhook(payload: any, signature: string): boolean {
-    return true;
+  verifyWebhook(rawBody: string, signature: string): boolean {
+    return true; // Mock always returns true
   }
 }
