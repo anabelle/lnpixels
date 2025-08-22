@@ -1,4 +1,4 @@
-import { useQueryState } from 'nuqs';
+import { useState, useEffect, useCallback } from 'react';
 
 export interface UrlState {
   x: number;
@@ -10,37 +10,60 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 10;
 
 export const useUrlState = () => {
-  const [x, setX] = useQueryState('x', {
-    defaultValue: 0,
-    parse: (value) => {
-      const parsed = parseFloat(value);
-      return isNaN(parsed) ? 0 : Math.round(parsed);
-    },
+  const [urlState, setUrlState] = useState<UrlState>({
+    x: 0,
+    y: 0,
+    z: 1,
   });
 
-  const [y, setY] = useQueryState('y', {
-    defaultValue: 0,
-    parse: (value) => {
+  // Parse URL parameters on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    const parseNumber = (value: string | null, defaultValue: number): number => {
+      if (!value) return defaultValue;
       const parsed = parseFloat(value);
-      return isNaN(parsed) ? 0 : Math.round(parsed);
-    },
-  });
+      return isNaN(parsed) ? defaultValue : Math.round(parsed);
+    };
 
-  const [z, setZ] = useQueryState('z', {
-    defaultValue: 1,
-    parse: (value) => {
-      const parsed = parseFloat(value);
-      return isNaN(parsed) ? 1 : Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(parsed)));
-    },
-  });
+    const x = parseNumber(params.get('x'), 0);
+    const y = parseNumber(params.get('y'), 0);
+    let z = parseNumber(params.get('z'), 1);
 
-  const urlState: UrlState = { x, y, z };
+    // Clamp zoom to valid range
+    z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
 
-  const updateUrlState = (newState: Partial<UrlState>) => {
-    if (newState.x !== undefined) setX(newState.x);
-    if (newState.y !== undefined) setY(newState.y);
-    if (newState.z !== undefined) setZ(newState.z);
-  };
+    setUrlState({ x, y, z });
+  }, []);
+
+  const updateUrlState = useCallback((newState: Partial<UrlState>) => {
+    const currentState = { ...urlState, ...newState };
+
+    // Round coordinates to integers
+    const roundedState = {
+      x: Math.round(currentState.x),
+      y: Math.round(currentState.y),
+      z: Math.round(currentState.z),
+    };
+
+    // Only update if something actually changed
+    if (
+      roundedState.x !== urlState.x ||
+      roundedState.y !== urlState.y ||
+      roundedState.z !== urlState.z
+    ) {
+      setUrlState(roundedState);
+
+      // Update URL
+      const params = new URLSearchParams();
+      params.set('x', roundedState.x.toString());
+      params.set('y', roundedState.y.toString());
+      params.set('z', roundedState.z.toString());
+
+      const newUrl = `/?${params.toString()}`;
+      window.history.replaceState(null, '', newUrl);
+    }
+  }, [urlState]);
 
   return {
     urlState,
