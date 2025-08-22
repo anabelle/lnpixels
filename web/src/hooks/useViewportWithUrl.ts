@@ -43,8 +43,12 @@ export const useViewportWithUrl = () => {
 
   const handleZoom = useCallback((zoomFactor: number) => {
     try {
+      // Calculate what the zoom function will actually apply
+      const safeZoomFactor = Math.max(0.1, Math.min(10, zoomFactor));
+      const newZoom = Math.max(5, Math.min(100, viewport.zoom * safeZoomFactor));
+
       zoom(zoomFactor);
-      const newZoom = Math.max(5, Math.min(100, viewport.zoom * zoomFactor));
+
       const newUrlState = viewportToUrl({
         ...viewport,
         zoom: newZoom,
