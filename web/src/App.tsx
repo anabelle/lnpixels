@@ -173,15 +173,33 @@ const ActivityFeed = ({ collapsed, onToggle }: { collapsed?: boolean; onToggle?:
   </aside>
 );
 
-const MobileTabs = () => (
+const MobileTabs = ({ activeTab, onTabChange }: { activeTab: string; onTabChange: (tab: string) => void }) => (
   <nav className="mobile-tabs" role="tablist" aria-label="Mobile navigation">
-    <button className="tab-button active" role="tab" aria-selected="true" aria-controls="canvas-panel">
+    <button
+      className={`tab-button ${activeTab === 'canvas' ? 'active' : ''}`}
+      role="tab"
+      aria-selected={activeTab === 'canvas'}
+      aria-controls="canvas-panel"
+      onClick={() => onTabChange('canvas')}
+    >
       <span>Canvas</span>
     </button>
-    <button className="tab-button" role="tab" aria-selected="false" aria-controls="purchase-panel">
+    <button
+      className={`tab-button ${activeTab === 'purchase' ? 'active' : ''}`}
+      role="tab"
+      aria-selected={activeTab === 'purchase'}
+      aria-controls="purchase-panel"
+      onClick={() => onTabChange('purchase')}
+    >
       <span>Purchase</span>
     </button>
-    <button className="tab-button" role="tab" aria-selected="false" aria-controls="activity-panel">
+    <button
+      className={`tab-button ${activeTab === 'activity' ? 'active' : ''}`}
+      role="tab"
+      aria-selected={activeTab === 'activity'}
+      aria-controls="activity-panel"
+      onClick={() => onTabChange('activity')}
+    >
       <span>Activity</span>
     </button>
   </nav>
@@ -225,7 +243,7 @@ function AppContent() {
             {activeTab === 'canvas' && <Canvas />}
             {activeTab === 'purchase' && <PurchasePanel />}
             {activeTab === 'activity' && <ActivityFeed />}
-            <MobileTabs />
+            <MobileTabs activeTab={activeTab} onTabChange={setActiveTab} />
           </>
         )}
       </div>
