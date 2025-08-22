@@ -51,73 +51,103 @@ const Canvas = () => (
   </main>
 );
 
-const PurchasePanel = () => (
-  <aside className="purchase-panel" role="complementary" aria-label="Purchase panel">
-    <div className="panel-section">
+const PurchasePanel = ({ collapsed, onToggle }: { collapsed?: boolean; onToggle?: () => void }) => (
+  <aside className={`purchase-panel ${collapsed ? 'collapsed' : ''}`} role="complementary" aria-label="Purchase panel">
+    <div className="panel-header">
       <h3>Pixel Purchase</h3>
-      <div className="pixel-type-selector" role="radiogroup" aria-label="Pixel type selection">
-        <button className="type-button active" role="radio" aria-checked="true" aria-label="Basic pixel for 1 satoshi">
-          Basic (1 sat)
+      {onToggle && (
+        <button
+          className="toggle-button"
+          onClick={onToggle}
+          aria-label={collapsed ? 'Expand purchase panel' : 'Collapse purchase panel'}
+        >
+          {collapsed ? '→' : '←'}
         </button>
-        <button className="type-button" role="radio" aria-checked="false" aria-label="Color pixel for 10 satoshis">
-          Color (10 sats)
-        </button>
-        <button className="type-button" role="radio" aria-checked="false" aria-label="Color plus letter pixel for 100 satoshis">
-          Color + Letter (100 sats)
-        </button>
-      </div>
+      )}
     </div>
 
-    <div className="panel-section">
-      <h4>Selected Pixels</h4>
-      <div className="selection-summary" role="region" aria-label="Selection summary">
-        <div className="summary-item">
-          <span>Count:</span>
-          <span aria-label="Selected pixel count">0</span>
+    {!collapsed && (
+      <>
+        <div className="panel-section">
+          <div className="pixel-type-selector" role="radiogroup" aria-label="Pixel type selection">
+            <button className="type-button active" role="radio" aria-checked="true" aria-label="Basic pixel for 1 satoshi">
+              Basic (1 sat)
+            </button>
+            <button className="type-button" role="radio" aria-checked="false" aria-label="Color pixel for 10 satoshis">
+              Color (10 sats)
+            </button>
+            <button className="type-button" role="radio" aria-checked="false" aria-label="Color plus letter pixel for 100 satoshis">
+              Color + Letter (100 sats)
+            </button>
+          </div>
         </div>
-        <div className="summary-item">
-          <span>Total:</span>
-          <span aria-label="Total cost in satoshis">0 sats</span>
-        </div>
-      </div>
-    </div>
 
-    <div className="panel-section">
-      <button className="purchase-button" disabled aria-describedby="purchase-status">
-        Generate Invoice
-      </button>
-      <div id="purchase-status" className="sr-only">
-        No pixels selected. Please select pixels to generate an invoice.
-      </div>
-    </div>
+        <div className="panel-section">
+          <h4>Selected Pixels</h4>
+          <div className="selection-summary" role="region" aria-label="Selection summary">
+            <div className="summary-item">
+              <span>Count:</span>
+              <span aria-label="Selected pixel count">0</span>
+            </div>
+            <div className="summary-item">
+              <span>Total:</span>
+              <span aria-label="Total cost in satoshis">0 sats</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="panel-section">
+          <button className="purchase-button" disabled aria-describedby="purchase-status">
+            Generate Invoice
+          </button>
+          <div id="purchase-status" className="sr-only">
+            No pixels selected. Please select pixels to generate an invoice.
+          </div>
+        </div>
+      </>
+    )}
   </aside>
 );
 
-const ActivityFeed = () => (
-  <aside className="activity-feed" role="complementary" aria-label="Activity feed">
-    <div className="panel-section">
+const ActivityFeed = ({ collapsed, onToggle }: { collapsed?: boolean; onToggle?: () => void }) => (
+  <aside className={`activity-feed ${collapsed ? 'collapsed' : ''}`} role="complementary" aria-label="Activity feed">
+    <div className="panel-header">
       <h3>Recent Activity</h3>
-      <div className="activity-list" role="log" aria-label="Recent pixel purchases" aria-live="polite">
-        <div className="activity-item" role="article">
-          <div className="activity-content">
-            <span className="activity-text">Pixel (10, 20) purchased</span>
-            <time className="activity-time" dateTime="2024-01-01T12:00:00Z">2 min ago</time>
+      {onToggle && (
+        <button
+          className="toggle-button"
+          onClick={onToggle}
+          aria-label={collapsed ? 'Expand activity feed' : 'Collapse activity feed'}
+        >
+          {collapsed ? '←' : '→'}
+        </button>
+      )}
+    </div>
+
+    {!collapsed && (
+      <div className="panel-section">
+        <div className="activity-list" role="log" aria-label="Recent pixel purchases" aria-live="polite">
+          <div className="activity-item" role="article">
+            <div className="activity-content">
+              <span className="activity-text">Pixel (10, 20) purchased</span>
+              <time className="activity-time" dateTime="2024-01-01T12:00:00Z">2 min ago</time>
+            </div>
           </div>
-        </div>
-        <div className="activity-item" role="article">
-          <div className="activity-content">
-            <span className="activity-text">Rectangle 5×3 purchased</span>
-            <time className="activity-time" dateTime="2024-01-01T11:55:00Z">5 min ago</time>
+          <div className="activity-item" role="article">
+            <div className="activity-content">
+              <span className="activity-text">Rectangle 5×3 purchased</span>
+              <time className="activity-time" dateTime="2024-01-01T11:55:00Z">5 min ago</time>
+            </div>
           </div>
-        </div>
-        <div className="activity-item" role="article">
-          <div className="activity-content">
-            <span className="activity-text">Pixel (0, 0) updated</span>
-            <time className="activity-time" dateTime="2024-01-01T11:52:00Z">8 min ago</time>
+          <div className="activity-item" role="article">
+            <div className="activity-content">
+              <span className="activity-text">Pixel (0, 0) updated</span>
+              <time className="activity-time" dateTime="2024-01-01T11:52:00Z">8 min ago</time>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    )}
   </aside>
 );
 
@@ -138,6 +168,8 @@ const MobileTabs = () => (
 function App() {
   const [isMobile, setIsMobile] = useState(false);
   const [activeTab, setActiveTab] = useState('canvas');
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 
   // Simple mobile detection (in real app, use proper media queries)
   React.useEffect(() => {
@@ -151,12 +183,18 @@ function App() {
     <div className="app">
       <Header />
 
-      <div className="main-layout">
+      <div className={`main-layout ${leftPanelCollapsed ? 'left-collapsed' : ''} ${rightPanelCollapsed ? 'right-collapsed' : ''}`}>
         {!isMobile && (
           <>
+            <PurchasePanel
+              collapsed={leftPanelCollapsed}
+              onToggle={() => setLeftPanelCollapsed(!leftPanelCollapsed)}
+            />
             <Canvas />
-            <PurchasePanel />
-            <ActivityFeed />
+            <ActivityFeed
+              collapsed={rightPanelCollapsed}
+              onToggle={() => setRightPanelCollapsed(!rightPanelCollapsed)}
+            />
           </>
         )}
 

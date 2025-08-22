@@ -31,4 +31,12 @@ describe('App', () => {
     expect(screen.getByRole('main')).toBeInTheDocument(); // canvas area
     expect(screen.getAllByRole('complementary')).toHaveLength(2); // sidebars
   });
+
+  it('should support panel toggling', () => {
+    render(<App />);
+
+    // Check that toggle buttons exist
+    const toggleButtons = screen.getAllByLabelText(/toggle|collapse|expand/i);
+    expect(toggleButtons.length).toBeGreaterThan(0);
+  });
 });
