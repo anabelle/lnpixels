@@ -108,12 +108,13 @@ export function setupRoutes(io: SocketServer) {
         { x, y, color, letter }
       );
 
-      res.json({
-        invoice: invoice.invoice,
-        payment_hash: invoice.payment_hash,
-        amount: pixelPrice,
-        id: invoice.id
-      });
+       res.json({
+         invoice: invoice.invoice,
+         payment_hash: invoice.payment_hash,
+         amount: pixelPrice,
+         id: invoice.id,
+         isMock: !process.env.NAKAPAY_API_KEY
+       });
     } catch (error) {
       console.error('Error creating invoice:', error);
       res.status(500).json({ error: 'Failed to create invoice' });
@@ -183,13 +184,14 @@ export function setupRoutes(io: SocketServer) {
         { x1, y1, x2, y2, color, letters, pixelUpdates }
       );
 
-      res.json({
-        invoice: invoice.invoice,
-        payment_hash: invoice.payment_hash,
-        amount: totalPrice,
-        id: invoice.id,
-        pixelCount: totalPixels
-      });
+       res.json({
+         invoice: invoice.invoice,
+         payment_hash: invoice.payment_hash,
+         amount: totalPrice,
+         id: invoice.id,
+         pixelCount: totalPixels,
+         isMock: !process.env.NAKAPAY_API_KEY
+       });
     } catch (error) {
       console.error('Error creating bulk invoice:', error);
       res.status(500).json({ error: 'Failed to create bulk invoice' });

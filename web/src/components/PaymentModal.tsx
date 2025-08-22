@@ -398,37 +398,68 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
             {/* QR Code Section */}
             <div className="qr-section">
-              <h4>Scan QR Code</h4>
-              <div className="qr-code-container">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(payment.invoice)}`}
-                  alt="Lightning Invoice QR Code"
-                  className="qr-code-image"
-                />
-              </div>
+              {(() => {
+                const isMock = payment.isMock;
+
+                return isMock ? (
+                  <>
+                    <h4>Test Payment (Mock Mode)</h4>
+                    <div className="qr-code-container" style={{ textAlign: 'center', padding: '2rem', backgroundColor: '#f8f9fa', borderRadius: '8px' }}>
+                      <p style={{ margin: 0, color: '#666' }}>
+                        Mock payment mode active.<br />
+                        Use the curl command below to simulate payment.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h4>Scan QR Code</h4>
+                    <div className="qr-code-container">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(payment.invoice)}`}
+                        alt="Lightning Invoice QR Code"
+                        className="qr-code-image"
+                      />
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
-            {/* Invoice Text Section */}
-            <div className="invoice-section">
-              <h4>Or Copy Invoice</h4>
-              <div className="invoice-text-container">
-                <textarea
-                  className="invoice-textarea"
-                  value={payment.invoice}
-                  readOnly
-                  onClick={(e) => e.currentTarget.select()}
-                />
-                <button
-                  className="copy-button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(payment.invoice);
-                    alert('Invoice copied to clipboard!');
-                  }}
-                >
-                  Copy
-                </button>
-              </div>
-            </div>
+             {/* Invoice Text Section */}
+             <div className="invoice-section">
+               <h4>Or Copy Invoice</h4>
+               <div className="invoice-text-container">
+                 {(() => {
+                   const isMock = payment.isMock;
+                   const copyableText = isMock
+                     ? `curl -X POST http://localhost:3000/api/nakapay \\
+  -H "Content-Type: application/json" \\
+  -d '{"payment_hash": "${payment.payment_hash || payment.id}", "status": "completed"}'`
+                     : payment.invoice;
+
+                   return (
+                     <>
+                       <textarea
+                         className="invoice-textarea"
+                         value={copyableText}
+                         readOnly
+                         onClick={(e) => e.currentTarget.select()}
+                       />
+                       <button
+                         className="copy-button"
+                         onClick={() => {
+                           navigator.clipboard.writeText(copyableText);
+                           alert(isMock ? 'Curl command copied to clipboard!' : 'Invoice copied to clipboard!');
+                         }}
+                       >
+                         Copy
+                       </button>
+                     </>
+                   );
+                 })()}
+               </div>
+             </div>
 
             <div className="payment-instructions">
               <p>Open your Lightning wallet and scan the QR code or paste the invoice to complete the payment.</p>
