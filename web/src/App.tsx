@@ -1,23 +1,35 @@
 import React, { useState } from 'react';
 import './App.css';
+import { ThemeProvider, useTheme } from './theme';
 
 // Placeholder components for the layout
-const Header = () => (
-  <header className="header" role="banner">
-    <div className="header-content">
-      <h1 className="brand">LNPixels</h1>
-      <nav className="nav" aria-label="Main navigation">
-        <button className="nav-button" aria-label="Go to canvas">Canvas</button>
-        <button className="nav-button" aria-label="View activity feed">Activity</button>
-        <button className="nav-button" aria-label="Get help">Help</button>
-      </nav>
-      <div className="header-controls" aria-label="Canvas information">
-        <span className="coordinates" aria-label="Current coordinates">0, 0</span>
-        <span className="zoom" aria-label="Current zoom level">100%</span>
+const Header = () => {
+  const { actualTheme, toggleTheme } = useTheme();
+
+  return (
+    <header className="header" role="banner">
+      <div className="header-content">
+        <h1 className="brand">LNPixels</h1>
+        <nav className="nav" aria-label="Main navigation">
+          <button className="nav-button" aria-label="Go to canvas">Canvas</button>
+          <button className="nav-button" aria-label="View activity feed">Activity</button>
+          <button className="nav-button" aria-label="Get help">Help</button>
+        </nav>
+        <div className="header-controls" aria-label="Canvas information and controls">
+          <span className="coordinates" aria-label="Current coordinates">0, 0</span>
+          <span className="zoom" aria-label="Current zoom level">100%</span>
+          <button
+            className="theme-toggle"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${actualTheme === 'light' ? 'dark' : 'light'} mode`}
+          >
+            {actualTheme === 'light' ? '🌙' : '☀️'}
+          </button>
+        </div>
       </div>
-    </div>
-  </header>
-);
+    </header>
+  );
+};
 
 const Canvas = () => (
   <main className="canvas-container" role="main" aria-label="Pixel canvas">
@@ -175,7 +187,7 @@ const MobileTabs = () => (
   </nav>
 );
 
-function App() {
+function AppContent() {
   const [isMobile, setIsMobile] = useState(false);
   const [activeTab, setActiveTab] = useState('canvas');
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
@@ -218,6 +230,14 @@ function App() {
         )}
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }
 

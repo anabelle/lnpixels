@@ -5,11 +5,57 @@
   padding: 0;
 }
 
+/* Theme Variables */
+:root {
+  /* Light Theme (Default) */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #f1f5f9;
+  --bg-hover: #e1e5e9;
+
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+
+  --border-primary: #e1e5e9;
+  --border-secondary: #cbd5e1;
+
+  --accent-primary: #2563eb;
+  --accent-hover: #1d4ed8;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark Theme */
+.dark {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-hover: #475569;
+
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+
+  --border-primary: #334155;
+  --border-secondary: #475569;
+
+  --accent-primary: #3b82f6;
+  --accent-hover: #2563eb;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   line-height: 1.6;
-  color: #333;
-  background-color: #f8f9fa;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .app {
@@ -20,12 +66,13 @@ body {
 
 /* Header Styles */
 .header {
-  background: white;
-  border-bottom: 1px solid #e1e5e9;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-primary);
   padding: 0;
   position: sticky;
   top: 0;
   z-index: 100;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .header-content {
@@ -41,8 +88,9 @@ body {
 .brand {
   font-size: 1.5rem;
   font-weight: bold;
-  color: #2563eb;
+  color: var(--accent-primary);
   margin: 0;
+  transition: color 0.3s ease;
 }
 
 .nav {
@@ -57,13 +105,13 @@ body {
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.9rem;
-  color: #64748b;
+  color: var(--text-secondary);
   transition: all 0.2s;
 }
 
 .nav-button:hover {
-  background-color: #f1f5f9;
-  color: #334155;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .header-controls {
@@ -71,7 +119,23 @@ body {
   align-items: center;
   gap: 1rem;
   font-size: 0.9rem;
-  color: #64748b;
+  color: var(--text-secondary);
+}
+
+.theme-toggle {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+  color: var(--text-secondary);
+}
+
+.theme-toggle:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 /* Main Layout */
@@ -100,17 +164,19 @@ body {
 /* Canvas Area */
 .canvas-container {
   grid-area: canvas;
-  background: #ffffff;
-  border-right: 1px solid #e1e5e9;
+  background: var(--bg-primary);
+  border-right: 1px solid var(--border-primary);
   display: flex;
   flex-direction: column;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .canvas {
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: #f8f9fa;
+  background: var(--bg-secondary);
+  transition: background-color 0.3s ease;
 }
 
 .canvas-placeholder {
@@ -127,8 +193,9 @@ body {
   grid-template-columns: repeat(10, 20px);
   grid-template-rows: repeat(10, 20px);
   gap: 1px;
-  background: #e1e5e9;
+  background: var(--border-primary);
   padding: 1px;
+  transition: background-color 0.3s ease;
 }
 
 .pixel {
@@ -167,17 +234,17 @@ body {
 /* Sidebar Panels */
 .purchase-panel,
 .activity-feed {
-  background: white;
-  border-right: 1px solid #e1e5e9;
+  background: var(--bg-primary);
+  border-right: 1px solid var(--border-primary);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  transition: width 0.3s ease;
+  transition: width 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .purchase-panel {
   grid-area: purchase;
-  border-left: 1px solid #e1e5e9;
+  border-left: 1px solid var(--border-primary);
   border-right: none;
 }
 
@@ -191,14 +258,16 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 1.5rem;
-  border-bottom: 1px solid #f1f5f9;
-  background: #f8f9fa;
+  border-bottom: 1px solid var(--border-secondary);
+  background: var(--bg-secondary);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .panel-header h3 {
   margin: 0;
-  color: #1e293b;
+  color: var(--text-primary);
   font-size: 1.1rem;
+  transition: color 0.3s ease;
 }
 
 .toggle-button {
@@ -208,13 +277,13 @@ body {
   cursor: pointer;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
-  color: #64748b;
+  color: var(--text-secondary);
   transition: all 0.2s;
 }
 
 .toggle-button:hover {
-  background: #e1e5e9;
-  color: #334155;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 /* Collapsed Panel Styles */
@@ -227,7 +296,7 @@ body {
 
 .purchase-panel.collapsed:hover,
 .activity-feed.collapsed:hover {
-  background-color: #f1f5f9;
+  background-color: var(--bg-tertiary);
 }
 
 .purchase-panel.collapsed .panel-section,
@@ -269,7 +338,8 @@ body {
 
 .panel-section {
   padding: 1.5rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border-secondary);
+  transition: border-color 0.3s ease;
 }
 
 .panel-section:last-child {
@@ -278,14 +348,16 @@ body {
 
 .panel-section h3 {
   margin-bottom: 1rem;
-  color: #1e293b;
+  color: var(--text-primary);
   font-size: 1.1rem;
+  transition: color 0.3s ease;
 }
 
 .panel-section h4 {
   margin-bottom: 0.75rem;
-  color: #475569;
+  color: var(--text-secondary);
   font-size: 0.95rem;
+  transition: color 0.3s ease;
 }
 
 /* Purchase Panel Specific */
@@ -297,24 +369,25 @@ body {
 
 .type-button {
   padding: 0.75rem;
-  border: 2px solid #e1e5e9;
-  background: white;
+  border: 2px solid var(--border-primary);
+  background: var(--bg-primary);
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.9rem;
   transition: all 0.2s;
   text-align: left;
+  color: var(--text-primary);
 }
 
 .type-button:hover {
-  border-color: #2563eb;
-  background-color: #eff6ff;
+  border-color: var(--accent-primary);
+  background-color: var(--bg-tertiary);
 }
 
 .type-button.active {
-  border-color: #2563eb;
-  background-color: #eff6ff;
-  color: #2563eb;
+  border-color: var(--accent-primary);
+  background-color: var(--bg-tertiary);
+  color: var(--accent-primary);
 }
 
 .selection-summary {
@@ -328,7 +401,8 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border-secondary);
+  transition: border-color 0.3s ease;
 }
 
 .summary-item:last-child {
@@ -338,7 +412,7 @@ body {
 .purchase-button {
   width: 100%;
   padding: 1rem;
-  background: #2563eb;
+  background: var(--accent-primary);
   color: white;
   border: none;
   border-radius: 6px;
@@ -349,11 +423,11 @@ body {
 }
 
 .purchase-button:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: var(--accent-hover);
 }
 
 .purchase-button:disabled {
-  background: #94a3b8;
+  background: var(--text-tertiary);
   cursor: not-allowed;
 }
 
@@ -366,9 +440,10 @@ body {
 
 .activity-item {
   padding: 0.75rem;
-  background: #f8f9fa;
+  background: var(--bg-tertiary);
   border-radius: 6px;
-  border-left: 3px solid #2563eb;
+  border-left: 3px solid var(--accent-primary);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .activity-content {
@@ -379,12 +454,14 @@ body {
 
 .activity-text {
   font-size: 0.9rem;
-  color: #1e293b;
+  color: var(--text-primary);
+  transition: color 0.3s ease;
 }
 
 .activity-time {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
 }
 
 /* Mobile Layout */
@@ -419,13 +496,14 @@ body {
 
   .mobile-tabs {
     display: flex;
-    background: white;
-    border-top: 1px solid #e1e5e9;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-primary);
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     z-index: 100;
+    transition: background-color 0.3s ease, border-color 0.3s ease;
   }
 
   .tab-button {
@@ -435,13 +513,13 @@ body {
     background: none;
     cursor: pointer;
     font-size: 0.9rem;
-    color: #64748b;
+    color: var(--text-secondary);
     transition: all 0.2s;
   }
 
   .tab-button.active {
-    color: #2563eb;
-    background: #eff6ff;
+    color: var(--accent-primary);
+    background: var(--bg-tertiary);
   }
 
   .tab-button span {

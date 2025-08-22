@@ -39,4 +39,20 @@ describe('App', () => {
     const toggleButtons = screen.getAllByLabelText(/toggle|collapse|expand/i);
     expect(toggleButtons.length).toBeGreaterThan(0);
   });
+
+  it('should have theme toggle functionality', () => {
+    render(<App />);
+
+    // Check that theme toggle button exists
+    const themeToggle = screen.getByLabelText(/toggle theme|switch theme|dark mode|light mode/i);
+    expect(themeToggle).toBeInTheDocument();
+  });
+
+  it('should support theme switching', () => {
+    render(<App />);
+
+    // Check that theme classes are applied to root element
+    const root = document.documentElement;
+    expect(root).toHaveClass(/light|dark/);
+  });
 });
