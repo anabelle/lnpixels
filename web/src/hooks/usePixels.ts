@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchPixels, Pixel, Rectangle } from '../lib/api';
 import { useViewportContext } from '../contexts/ViewportContext';
+import { io, Socket } from 'socket.io-client';
 
 interface UsePixelsResult {
   pixels: Pixel[];
   loading: boolean;
   error: string | null;
   refetchPixels: () => void;
+  emitTestPixelUpdate?: () => void;
 }
 
 // Simple cache for pixel data
@@ -32,6 +34,9 @@ export function usePixels(): UsePixelsResult {
   const lastFetchTime = useRef<number>(0);
   const throttleTimeout = useRef<NodeJS.Timeout | null>(null);
   const pendingFetch = useRef<boolean>(false);
+
+  // WebSocket connection
+  const socketRef = useRef<Socket | null>(null);
 
   const fetchPixelsData = useCallback(async (force: boolean = false) => {
     // Throttle API calls to prevent excessive requests
@@ -108,6 +113,58 @@ export function usePixels(): UsePixelsResult {
     }
   }, [viewport]);
 
+  // Setup WebSocket connection for real-time updates
+  useEffect(() => {
+    // Connect to the backend WebSocket server
+    socketRef.current = io('/', {
+      path: '/api/socket.io', // Socket.IO path
+      transports: ['websocket', 'polling']
+    });
+
+    const socket = socketRef.current;
+
+    socket.on('connect', () => {
+      console.log('Connected to WebSocket server');
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Disconnected from WebSocket server');
+    });
+
+    // Listen for pixel updates from webhook payments
+    socket.on('pixel.update', (updatedPixel: Pixel) => {
+      console.log('Received pixel update via WebSocket:', updatedPixel);
+
+      setPixels(currentPixels => {
+        const existingIndex = currentPixels.findIndex(p => p.x === updatedPixel.x && p.y === updatedPixel.y);
+
+        if (existingIndex >= 0) {
+          // Update existing pixel
+          const newPixels = [...currentPixels];
+          newPixels[existingIndex] = updatedPixel;
+          return newPixels;
+        } else {
+          // Add new pixel
+          return [...currentPixels, updatedPixel];
+        }
+      });
+    });
+
+    socket.on('activity.append', (activity) => {
+      console.log('Received activity update via WebSocket:', activity);
+      // Activity updates are handled by the ActivityFeed component
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('WebSocket connection error:', error);
+    });
+
+    // Cleanup on unmount
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
   // Fetch pixels when viewport changes, but with throttling
   useEffect(() => {
     fetchPixelsData();
@@ -127,11 +184,19 @@ export function usePixels(): UsePixelsResult {
     fetchPixelsData(true);
   }, [fetchPixelsData]);
 
+  // Function to emit test pixel update (for development)
+  const emitTestPixelUpdate = useCallback(() => {
+    if (socketRef.current) {
+      socketRef.current.emit('test-update');
+    }
+  }, []);
+
   return {
     pixels,
     loading,
     error,
     refetchPixels,
+    emitTestPixelUpdate,
   };
 }
 
