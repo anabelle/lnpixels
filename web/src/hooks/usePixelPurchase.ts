@@ -116,8 +116,10 @@ export const usePixelPurchase = () => {
       );
 
       if (existingPixel) {
-        // Pixel already exists - use 2x last sold price
-        const pixelPrice = existingPixel.sats * 2;
+        // Pixel already exists - charge maximum of (2x last price, base price for new pixel type)
+        const doubleLastPrice = existingPixel.sats * 2;
+        const basePriceForNewType = PRICING[state.type];
+        const pixelPrice = Math.max(doubleLastPrice, basePriceForNewType);
         totalPrice += pixelPrice;
       } else {
         // New pixel - use base price for selected type
