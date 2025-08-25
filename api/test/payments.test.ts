@@ -6,6 +6,7 @@ import express from 'express';
 import { setupRoutes } from '../src/routes.js';
 import { Server as SocketServer } from 'socket.io';
 import { Server } from 'http';
+import { createTestDatabase } from '../src/database.js';
 
 describe('PaymentsAdapter', () => {
   let adapter: MockPaymentsAdapter;
@@ -87,9 +88,13 @@ describe('Webhook Integration Tests', () => {
   let app: express.Application;
   let io: SocketServer;
   let server: Server;
+  let db: any;
   const secret = 'test-webhook-secret';
 
   beforeEach(() => {
+    // Create a fresh in-memory database for each test
+    db = createTestDatabase(':memory:');
+
     // Setup Express app with Socket.IO
     app = express();
     server = new Server(app);
@@ -108,8 +113,8 @@ describe('Webhook Integration Tests', () => {
       }
     }));
 
-    // Setup routes
-    app.use('/api', setupRoutes(io));
+    // Setup routes with test database
+    app.use('/api', setupRoutes(io, db));
   });
 
   afterEach(() => {

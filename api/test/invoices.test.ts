@@ -3,17 +3,19 @@ import request from 'supertest';
 import express from 'express';
 import { setupSocket } from '../src/socket';
 import { setupRoutes } from '../src/routes';
-import { pixels } from '../src/routes';
+import { createTestDatabase } from '../src/database';
 
 describe('POST /invoices', () => {
   let app: express.Application;
+  let db: any;
 
   beforeEach(() => {
-    pixels.length = 0;
+    // Create a fresh in-memory database for each test
+    db = createTestDatabase(':memory:');
     app = express();
     app.use(express.json());
     const { io } = setupSocket(app);
-    app.use(setupRoutes(io));
+    app.use(setupRoutes(io, db));
   });
 
   it('should create an invoice for a single pixel', async () => {
@@ -50,13 +52,15 @@ describe('POST /invoices', () => {
 
 describe('POST /invoices/bulk', () => {
   let app: express.Application;
+  let db: any;
 
   beforeEach(() => {
-    pixels.length = 0;
+    // Create a fresh in-memory database for each test
+    db = createTestDatabase(':memory:');
     app = express();
     app.use(express.json());
     const { io } = setupSocket(app);
-    app.use(setupRoutes(io));
+    app.use(setupRoutes(io, db));
   });
 
   it('should create a bulk invoice for rectangle', async () => {

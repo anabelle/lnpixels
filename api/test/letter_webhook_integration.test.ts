@@ -5,13 +5,18 @@ import crypto from 'crypto';
 import { setupRoutes } from '../src/routes.js';
 import { Server as SocketServer } from 'socket.io';
 import { Server } from 'http';
+import { createTestDatabase } from '../src/database.js';
 
 describe('Letter Webhook Integration', () => {
   let app: express.Application;
   let server: Server;
   let io: SocketServer;
+  let db: any;
 
   beforeEach(() => {
+    // Create a fresh in-memory database for each test
+    db = createTestDatabase(':memory:');
+
     app = express();
 
     // Setup middleware to capture raw body for webhook
@@ -28,8 +33,8 @@ describe('Letter Webhook Integration', () => {
     io = new SocketServer(httpServer);
     server = httpServer;
 
-    // Setup routes
-    app.use('/api', setupRoutes(io));
+    // Setup routes with test database
+    app.use('/api', setupRoutes(io, db));
   });
 
   afterEach((done) => {

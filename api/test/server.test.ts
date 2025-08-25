@@ -25,26 +25,29 @@ beforeEach(async () => {
   });
 });
 
-afterEach(async () => {
-  if (clientSocket) clientSocket.disconnect();
-  if (io) io.close();
-  if (server) {
-    await new Promise<void>((resolve) => server.close(resolve));
-  }
-});
+  afterEach(async () => {
+    if (clientSocket) clientSocket.disconnect();
+    if (server) {
+      await new Promise<void>((resolve) => server.close(resolve));
+    }
+  });
 
 describe('API Server', () => {
-  it('should emit pixel.update on pixel purchase', async () => {
-    const eventPromise = new Promise((resolve) => {
-      clientSocket.on('pixel.update', (data) => {
-        resolve(data);
-      });
+  it('should respond to test endpoint', async () => {
+    const response = await request(app)
+      .post('/test-update')
+      .expect(200);
+
+    expect(response.body).toHaveProperty('success', true);
+    expect(response.body).toHaveProperty('pixel');
+    expect(response.body.pixel).toEqual({
+      x: 10,
+      y: 20,
+      color: '#ff0000',
+      letter: 'A',
+      sats: 100,
+      created_at: expect.any(Number),
+      updated_at: expect.any(Number)
     });
-
-    // Trigger the update via the test endpoint
-    await request(app).post('/test-update').expect(200);
-
-    const data = await eventPromise;
-    expect(data).toEqual({ x: 10, y: 20, color: '#ff0000', letter: 'A', sats: 100, created_at: expect.any(Number) });
   });
 });

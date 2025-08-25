@@ -2,21 +2,21 @@ import { Router } from 'express';
 import { Namespace } from 'socket.io';
 import { PaymentsAdapter, NakaPayAdapter, MockPaymentsAdapter } from './payments.js';
 import { price } from './pricing.js';
+import { getDatabase, PixelDatabase, Pixel } from './database.js';
 
 // Track processed payment IDs for idempotency
 const processedPayments = new Set<string>();
 
 const router = Router();
 
-// In-memory storage for pixels (will be replaced with database later)
-export let pixels: any[] = [];
-
 // Initialize payments adapter
 const paymentsAdapter: PaymentsAdapter = process.env.NAKAPAY_API_KEY
   ? new NakaPayAdapter()
   : new MockPaymentsAdapter();
 
-export function setupRoutes(io: Namespace) {
+export function setupRoutes(io: Namespace, db?: PixelDatabase) {
+  // Use provided database or get default instance
+  const database = db || getDatabase();
   // API info endpoint (mounted at /api/)
   router.get('/', (req, res) => res.json({
     name: 'LNPixels API',
@@ -45,28 +45,29 @@ export function setupRoutes(io: Namespace) {
     }
   }));
 
-  // GET /pixels - returns pixels within specified rectangle
-  router.get('/pixels', (req, res) => {
-    const { x1, y1, x2, y2 } = req.query;
+   // GET /pixels - returns pixels within specified rectangle
+   router.get('/pixels', (req, res) => {
+     const { x1, y1, x2, y2 } = req.query;
 
-    // Validate parameters
-    const x1Num = parseInt(x1 as string);
-    const y1Num = parseInt(y1 as string);
-    const x2Num = parseInt(x2 as string);
-    const y2Num = parseInt(y2 as string);
+     // Validate parameters
+     const x1Num = parseInt(x1 as string);
+     const y1Num = parseInt(y1 as string);
+     const x2Num = parseInt(x2 as string);
+     const y2Num = parseInt(y2 as string);
 
-    if (isNaN(x1Num) || isNaN(y1Num) || isNaN(x2Num) || isNaN(y2Num)) {
-      return res.status(400).json({ error: 'Invalid rectangle coordinates' });
-    }
+     if (isNaN(x1Num) || isNaN(y1Num) || isNaN(x2Num) || isNaN(y2Num)) {
+       return res.status(400).json({ error: 'Invalid rectangle coordinates' });
+     }
 
-    // Filter pixels within the rectangle bounds
-    const pixelsInRect = pixels.filter(pixel =>
-      pixel.x >= x1Num && pixel.x <= x2Num &&
-      pixel.y >= y1Num && pixel.y <= y2Num
-    );
-
-    res.json(pixelsInRect);
-  });
+     try {
+       // Get pixels from database
+       const pixelsInRect = database.getPixelsInRectangle(x1Num, y1Num, x2Num, y2Num);
+       res.json(pixelsInRect);
+     } catch (error) {
+       console.error('Error fetching pixels:', error);
+       res.status(500).json({ error: 'Failed to fetch pixels' });
+     }
+   });
 
   // POST /invoices - Create invoice for single pixel purchase
   router.post('/invoices', async (req, res) => {
@@ -78,9 +79,9 @@ export function setupRoutes(io: Namespace) {
         return res.status(400).json({ error: 'Invalid coordinates' });
       }
 
-      // Find existing pixel to get last price
-      const existingPixel = pixels.find(p => p.x === x && p.y === y);
-      const lastPrice = existingPixel ? existingPixel.sats : null;
+       // Find existing pixel to get last price
+       const existingPixel = database.getPixel(x, y);
+       const lastPrice = existingPixel ? existingPixel.sats : null;
 
       // Calculate price
       const pixelPrice = price({ color, letter, lastPrice });
@@ -133,33 +134,33 @@ export function setupRoutes(io: Namespace) {
       let totalPrice = 0;
       const pixelUpdates: any[] = [];
 
-      for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
-        for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
-          const existingPixel = pixels.find(p => p.x === x && p.y === y);
-          const lastPrice = existingPixel ? existingPixel.sats : null;
-          const pixelPrice = price({ color, letter: null, lastPrice });
-          totalPrice += pixelPrice;
+       for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+         for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+           const existingPixel = database.getPixel(x, y);
+           const lastPrice = existingPixel ? existingPixel.sats : null;
+           const pixelPrice = price({ color, letter: null, lastPrice });
+           totalPrice += pixelPrice;
 
-          pixelUpdates.push({ x, y, color, letter: null, price: pixelPrice });
-        }
-      }
+           pixelUpdates.push({ x, y, color, letter: null, price: pixelPrice });
+         }
+       }
 
-      // Assign letters if provided
-      if (letters) {
-        let letterIndex = 0;
-        for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
-          for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
-            if (letterIndex < letters.length) {
-              const existingPixel = pixels.find(p => p.x === x && p.y === y);
-              const lastPrice = existingPixel ? existingPixel.sats : null;
-              const pixelPrice = price({ color, letter: letters[letterIndex], lastPrice });
-              totalPrice += (pixelPrice - price({ color, letter: null, lastPrice })); // Add letter premium
-              pixelUpdates.find(p => p.x === x && p.y === y)!.letter = letters[letterIndex];
-              letterIndex++;
-            }
-          }
-        }
-      }
+       // Assign letters if provided
+       if (letters) {
+         let letterIndex = 0;
+         for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
+           for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
+             if (letterIndex < letters.length) {
+               const existingPixel = database.getPixel(x, y);
+               const lastPrice = existingPixel ? existingPixel.sats : null;
+               const pixelPrice = price({ color, letter: letters[letterIndex], lastPrice });
+               totalPrice += (pixelPrice - price({ color, letter: null, lastPrice })); // Add letter premium
+               pixelUpdates.find(p => p.x === x && p.y === y)!.letter = letters[letterIndex];
+               letterIndex++;
+             }
+           }
+         }
+       }
 
       // Create bulk invoice
       const invoice = await paymentsAdapter.createInvoice(
@@ -216,49 +217,45 @@ export function setupRoutes(io: Namespace) {
 
         const metadata = payload.metadata;
 
-        if (metadata.pixelUpdates) {
-          // Bulk payment
-          metadata.pixelUpdates.forEach((update: any) => {
-            const existingIndex = pixels.findIndex(p => p.x === update.x && p.y === update.y);
-            const newPixel = {
-              x: update.x,
-              y: update.y,
-              color: update.color,
-              letter: update.letter,
-              sats: update.price,
-              created_at: Date.now()
-            };
+         if (metadata.pixelUpdates) {
+           // Bulk payment - use database bulk upsert
+           const pixelData = metadata.pixelUpdates.map((update: any) => ({
+             x: update.x,
+             y: update.y,
+             color: update.color,
+             letter: update.letter,
+             sats: update.price
+           }));
 
-            if (existingIndex >= 0) {
-              pixels[existingIndex] = newPixel;
-            } else {
-              pixels.push(newPixel);
-            }
+           try {
+             const savedPixels = database.upsertPixels(pixelData);
 
-            // Emit real-time update
-            io.emit('pixel.update', newPixel);
-          });
-        } else {
-          // Single pixel payment
-          const existingIndex = pixels.findIndex(p => p.x === metadata.x && p.y === metadata.y);
-          const newPixel = {
-            x: metadata.x,
-            y: metadata.y,
-            color: metadata.color,
-            letter: metadata.letter,
-            sats: payload.amount,
-            created_at: Date.now()
-          };
+             // Emit real-time updates for each pixel
+             savedPixels.forEach(pixel => {
+               io.emit('pixel.update', pixel);
+             });
+           } catch (error) {
+             console.error('Error saving bulk pixels to database:', error);
+             return res.status(500).json({ error: 'Failed to save pixels' });
+           }
+         } else {
+           // Single pixel payment - use database upsert
+           try {
+             const savedPixel = database.upsertPixel({
+               x: metadata.x,
+               y: metadata.y,
+               color: metadata.color,
+               letter: metadata.letter,
+               sats: payload.amount
+             });
 
-          if (existingIndex >= 0) {
-            pixels[existingIndex] = newPixel;
-          } else {
-            pixels.push(newPixel);
-          }
-
-          // Emit real-time update
-          io.emit('pixel.update', newPixel);
-        }
+             // Emit real-time update
+             io.emit('pixel.update', savedPixel);
+           } catch (error) {
+             console.error('Error saving pixel to database:', error);
+             return res.status(500).json({ error: 'Failed to save pixel' });
+           }
+         }
 
         // Emit activity update
         io.emit('activity.append', {
@@ -288,6 +285,24 @@ export function setupRoutes(io: Namespace) {
   });
 
 
+
+  // Test endpoint for triggering pixel updates (only in development/test)
+  if (process.env.NODE_ENV !== 'production') {
+    router.post('/test-update', (req, res) => {
+      const testPixel = {
+        x: 10,
+        y: 20,
+        color: '#ff0000',
+        letter: 'A',
+        sats: 100,
+        created_at: Date.now(),
+        updated_at: Date.now()
+      };
+
+      io.emit('pixel.update', testPixel);
+      res.json({ success: true, pixel: testPixel });
+    });
+  }
 
   return router;
 }
