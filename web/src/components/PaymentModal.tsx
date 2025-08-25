@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NakaPayModal } from 'nakapay-react';
 import { SelectionState } from '../hooks/usePixelPurchase';
+import { io, Socket } from 'socket.io-client';
 
 interface PaymentModalProps {
    isOpen: boolean;
@@ -16,23 +17,24 @@ interface PaymentModalProps {
  }
 
 const PaymentModal: React.FC<PaymentModalProps> = ({
-   isOpen,
-   onClose,
-   selectionState,
-   purchasedPixels,
-   allPixels,
-   pixelType,
-   color,
-   letter,
-   onPaymentSuccess,
-   onPaymentError
- }) => {
-  console.log('PaymentModal props:', { isOpen, onClose: typeof onClose });
+    isOpen,
+    onClose,
+    selectionState,
+    purchasedPixels,
+    allPixels,
+    pixelType,
+    color,
+    letter,
+    onPaymentSuccess,
+    onPaymentError
+  }) => {
+   console.log('PaymentModal props:', { isOpen, onClose: typeof onClose });
 
-  const [payment, setPayment] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [paymentId, setPaymentId] = useState<string | null>(null);
+   const [payment, setPayment] = useState<any>(null);
+   const [isLoading, setIsLoading] = useState(false);
+   const [paymentSuccess, setPaymentSuccess] = useState(false);
+   const [paymentId, setPaymentId] = useState<string | null>(null);
+   const [socket, setSocket] = useState<Socket | null>(null);
 
   console.log('PaymentModal render:', { isOpen, selectionState, pixelType, color, letter });
   console.log('PaymentModal render check:', { isOpen, isLoading, payment: !!payment });
@@ -158,56 +160,45 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     console.log('handleClose completed');
   };
 
-  // Monitor for payment confirmation by checking pixel updates
-  useEffect(() => {
-    if (payment && isOpen && !paymentSuccess) {
-      console.log('Payment created, monitoring for pixel updates');
+   // Setup WebSocket connection for payment confirmation
+   useEffect(() => {
+     if (isOpen && paymentId) {
+       console.log('Setting up WebSocket connection for payment confirmation');
 
-      // Check if any of the selected pixels have been updated
-      const selectedPixels = selectionState.selectedPixels || [];
-      const selectedRectangle = selectionState.selectedRectangle;
+       // Connect to WebSocket server
+       const socketConnection = io('/api', {
+         transports: ['websocket', 'polling']
+       });
 
-      let paymentConfirmed = false;
+       socketConnection.on('connect', () => {
+         console.log('PaymentModal connected to WebSocket');
+       });
 
-      if (selectedPixels.length === 1) {
-        // Single pixel payment
-        const pixel = selectedPixels[0];
-        const updatedPixel = allPixels.find(p => p.x === pixel.x && p.y === pixel.y);
-        const wasPurchased = purchasedPixels.find(p => p.x === pixel.x && p.y === pixel.y);
+       // Listen for payment confirmation events
+       socketConnection.on('payment.confirmed', (data) => {
+         console.log('Received payment confirmation:', data);
+         if (data.paymentId === paymentId) {
+           console.log('Payment confirmed! Showing success');
+           setPaymentSuccess(true);
+           setTimeout(() => {
+             handlePaymentSuccess(payment);
+           }, 3000);
+         }
+       });
 
-        // Check if pixel was updated after payment was created
-        if (updatedPixel && wasPurchased && updatedPixel.sats > wasPurchased.sats) {
-          console.log('Single pixel payment confirmed:', updatedPixel);
-          paymentConfirmed = true;
-        }
-      } else if (selectedRectangle) {
-        // Bulk payment - check if any pixels in the rectangle were updated
-        const updatedPixelsInRect = allPixels.filter(p =>
-          p.x >= selectedRectangle.x1 && p.x <= selectedRectangle.x2 &&
-          p.y >= selectedRectangle.y1 && p.y <= selectedRectangle.y2
-        );
+       socketConnection.on('connect_error', (error) => {
+         console.error('PaymentModal WebSocket connection error:', error);
+       });
 
-        // Check if any pixels in the rectangle have higher sats than before
-        const hasUpdates = updatedPixelsInRect.some(updatedPixel => {
-          const wasPurchased = purchasedPixels.find(p => p.x === updatedPixel.x && p.y === updatedPixel.y);
-          return wasPurchased && updatedPixel.sats > wasPurchased.sats;
-        });
+       setSocket(socketConnection);
 
-        if (hasUpdates) {
-          console.log('Bulk payment confirmed - pixels updated in rectangle');
-          paymentConfirmed = true;
-        }
-      }
-
-      if (paymentConfirmed) {
-        console.log('Payment confirmed! Showing success');
-        setPaymentSuccess(true);
-        setTimeout(() => {
-          handlePaymentSuccess(payment);
-        }, 3000);
-      }
-    }
-  }, [payment, isOpen, paymentSuccess, selectionState, allPixels, purchasedPixels]);
+       // Cleanup on unmount or when modal closes
+       return () => {
+         console.log('Cleaning up PaymentModal WebSocket connection');
+         socketConnection.disconnect();
+       };
+     }
+   }, [isOpen, paymentId]);
 
   // Auto-create payment when modal opens
   React.useEffect(() => {

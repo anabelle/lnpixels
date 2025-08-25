@@ -311,6 +311,14 @@ export function setupRoutes(io: Namespace) {
           metadata
         });
 
+        // Emit payment confirmation event for the specific payment
+        io.emit('payment.confirmed', {
+          paymentId: paymentId,
+          amount: payload.amount,
+          timestamp: Date.now(),
+          metadata
+        });
+
         // Mark payment as processed for idempotency
         processedPayments.add(paymentId);
       }
