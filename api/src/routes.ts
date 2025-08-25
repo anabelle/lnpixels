@@ -227,34 +227,60 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
              sats: update.price
            }));
 
-           try {
-             const savedPixels = database.upsertPixels(pixelData);
+            try {
+              const savedPixels = database.upsertPixels(pixelData);
 
-             // Emit real-time updates for each pixel
-             savedPixels.forEach(pixel => {
-               io.emit('pixel.update', pixel);
-             });
-           } catch (error) {
-             console.error('Error saving bulk pixels to database:', error);
-             return res.status(500).json({ error: 'Failed to save pixels' });
-           }
+              // Insert activity records for bulk purchase
+              metadata.pixelUpdates.forEach((update: any) => {
+                database.insertActivity({
+                  x: update.x,
+                  y: update.y,
+                  color: update.color,
+                  letter: update.letter,
+                  sats: update.price,
+                  payment_hash: paymentId,
+                  created_at: Date.now(),
+                  type: 'bulk_purchase'
+                });
+              });
+
+              // Emit real-time updates for each pixel
+              savedPixels.forEach(pixel => {
+                io.emit('pixel.update', pixel);
+              });
+            } catch (error) {
+              console.error('Error saving bulk pixels to database:', error);
+              return res.status(500).json({ error: 'Failed to save pixels' });
+            }
          } else {
            // Single pixel payment - use database upsert
-           try {
-             const savedPixel = database.upsertPixel({
-               x: metadata.x,
-               y: metadata.y,
-               color: metadata.color,
-               letter: metadata.letter,
-               sats: payload.amount
-             });
+            try {
+              const savedPixel = database.upsertPixel({
+                x: metadata.x,
+                y: metadata.y,
+                color: metadata.color,
+                letter: metadata.letter,
+                sats: payload.amount
+              });
 
-             // Emit real-time update
-             io.emit('pixel.update', savedPixel);
-           } catch (error) {
-             console.error('Error saving pixel to database:', error);
-             return res.status(500).json({ error: 'Failed to save pixel' });
-           }
+              // Insert activity record for single purchase
+              database.insertActivity({
+                x: metadata.x,
+                y: metadata.y,
+                color: metadata.color,
+                letter: metadata.letter,
+                sats: payload.amount,
+                payment_hash: paymentId,
+                created_at: Date.now(),
+                type: 'single_purchase'
+              });
+
+              // Emit real-time update
+              io.emit('pixel.update', savedPixel);
+            } catch (error) {
+              console.error('Error saving pixel to database:', error);
+              return res.status(500).json({ error: 'Failed to save pixel' });
+            }
          }
 
         // Emit activity update
@@ -286,23 +312,45 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
 
 
-  // Test endpoint for triggering pixel updates (only in development/test)
-  if (process.env.NODE_ENV !== 'production') {
-    router.post('/test-update', (req, res) => {
-      const testPixel = {
-        x: 10,
-        y: 20,
-        color: '#ff0000',
-        letter: 'A',
-        sats: 100,
-        created_at: Date.now(),
-        updated_at: Date.now()
-      };
+   // GET /activity - Get recent activity feed
+   router.get('/activity', (req, res) => {
+     const limitParam = req.query.limit as string;
+     let limit = 20; // default limit
 
-      io.emit('pixel.update', testPixel);
-      res.json({ success: true, pixel: testPixel });
-    });
-  }
+     if (limitParam) {
+       const parsedLimit = parseInt(limitParam);
+       if (isNaN(parsedLimit) || parsedLimit <= 0) {
+         return res.status(400).json({ error: 'Invalid limit parameter' });
+       }
+       limit = Math.min(parsedLimit, 100); // max 100 items
+     }
 
-  return router;
+      try {
+        const activities = database.getRecentActivity(limit);
+        res.json({ events: activities });
+      } catch (error) {
+       console.error('Error fetching activity:', error);
+       res.status(500).json({ error: 'Failed to fetch activity' });
+     }
+   });
+
+   // Test endpoint for triggering pixel updates (only in development/test)
+   if (process.env.NODE_ENV !== 'production') {
+     router.post('/test-update', (req, res) => {
+       const testPixel = {
+         x: 10,
+         y: 20,
+         color: '#ff0000',
+         letter: 'A',
+         sats: 100,
+         created_at: Date.now(),
+         updated_at: Date.now()
+       };
+
+       io.emit('pixel.update', testPixel);
+       res.json({ success: true, pixel: testPixel });
+     });
+   }
+
+   return router;
 }

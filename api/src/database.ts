@@ -16,9 +16,25 @@ const CREATE_PIXELS_TABLE = `
   )
 `;
 
+const CREATE_ACTIVITY_TABLE = `
+  CREATE TABLE IF NOT EXISTS activity (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    x INTEGER NOT NULL,
+    y INTEGER NOT NULL,
+    color TEXT NOT NULL,
+    letter TEXT,
+    sats INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    payment_hash TEXT NOT NULL,
+    event_id TEXT,
+    type TEXT DEFAULT 'purchase'
+  )
+`;
+
 const CREATE_INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_pixels_position ON pixels(x, y);
   CREATE INDEX IF NOT EXISTS idx_pixels_created_at ON pixels(created_at);
+  CREATE INDEX IF NOT EXISTS idx_activity_created_at ON activity(created_at DESC);
 `;
 
 export interface Pixel {
@@ -30,6 +46,19 @@ export interface Pixel {
   sats: number;
   created_at: number;
   updated_at: number;
+}
+
+export interface Activity {
+  id?: number;
+  x: number;
+  y: number;
+  color: string;
+  letter?: string;
+  sats: number;
+  created_at: number;
+  payment_hash: string;
+  event_id?: string;
+  type: string;
 }
 
 export class PixelDatabase {
@@ -53,6 +82,7 @@ export class PixelDatabase {
 
     // Create tables
     this.db.exec(CREATE_PIXELS_TABLE);
+    this.db.exec(CREATE_ACTIVITY_TABLE);
     this.db.exec(CREATE_INDEXES);
 
     console.log('Database initialized successfully');
@@ -148,6 +178,42 @@ export class PixelDatabase {
     const stmt = this.db.prepare('SELECT COUNT(*) as count FROM pixels');
     const result = stmt.get() as { count: number };
     return result.count;
+  }
+
+  // Insert activity record
+  insertActivity(activity: Omit<Activity, 'id'>): Activity {
+    const stmt = this.db.prepare(`
+      INSERT INTO activity (x, y, color, letter, sats, created_at, payment_hash, event_id, type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      activity.x,
+      activity.y,
+      activity.color,
+      activity.letter || null,
+      activity.sats,
+      activity.created_at,
+      activity.payment_hash,
+      activity.event_id || null,
+      activity.type
+    );
+
+    return {
+      id: result.lastInsertRowid as number,
+      ...activity
+    };
+  }
+
+  // Get recent activity records
+  getRecentActivity(limit: number = 20): Activity[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM activity
+      ORDER BY created_at DESC
+      LIMIT ?
+    `);
+
+    return stmt.all(limit) as Activity[];
   }
 
   // Close database connection
