@@ -231,7 +231,8 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
               const savedPixels = database.upsertPixels(pixelData);
 
               // Insert activity records for bulk purchase
-              metadata.pixelUpdates.forEach((update: any) => {
+              const timestamp = Date.now();
+              const activityRecords = metadata.pixelUpdates.map((update: any) =>
                 database.insertActivity({
                   x: update.x,
                   y: update.y,
@@ -239,15 +240,29 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
                   letter: update.letter,
                   sats: update.price,
                   payment_hash: paymentId,
-                  created_at: Date.now(),
+                  created_at: timestamp,
                   type: 'bulk_purchase'
-                });
-              });
+                })
+              );
+
+              console.log('Created bulk activity records:', activityRecords);
 
               // Emit real-time updates for each pixel
               savedPixels.forEach(pixel => {
+                console.log('Emitting pixel.update for bulk purchase:', pixel);
                 io.emit('pixel.update', pixel);
               });
+
+              // Emit activity summary for bulk purchase
+              if (activityRecords.length > 0) {
+                const summaryActivity = {
+                  ...activityRecords[0], // Use first record as base
+                  summary: `${activityRecords.length} pixels purchased`,
+                  type: 'bulk_purchase'
+                };
+                console.log('Emitting bulk activity.append event:', summaryActivity);
+                io.emit('activity.append', summaryActivity);
+              }
             } catch (error) {
               console.error('Error saving bulk pixels to database:', error);
               return res.status(500).json({ error: 'Failed to save pixels' });
@@ -264,19 +279,25 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
               });
 
               // Insert activity record for single purchase
-              database.insertActivity({
+              const timestamp = Date.now();
+              const activityRecord = database.insertActivity({
                 x: metadata.x,
                 y: metadata.y,
                 color: metadata.color,
                 letter: metadata.letter,
                 sats: payload.amount,
                 payment_hash: paymentId,
-                created_at: Date.now(),
+                created_at: timestamp,
                 type: 'single_purchase'
               });
 
-              // Emit real-time update
+              console.log('Created activity record:', activityRecord);
+
+              // Emit real-time updates
+              console.log('Emitting pixel.update event:', savedPixel);
               io.emit('pixel.update', savedPixel);
+              console.log('Emitting activity.append event:', activityRecord);
+              io.emit('activity.append', activityRecord);
             } catch (error) {
               console.error('Error saving pixel to database:', error);
               return res.status(500).json({ error: 'Failed to save pixel' });
@@ -350,6 +371,26 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
        io.emit('pixel.update', testPixel);
        res.json({ success: true, pixel: testPixel });
      });
+
+     // Test endpoint for triggering activity updates
+      router.post('/test-activity', (req, res) => {
+        console.log('🧪 Test activity endpoint called');
+        const testActivity = {
+          x: 5,
+          y: 15,
+          color: '#00ff00',
+          letter: 'B',
+          sats: 50,
+          payment_hash: 'test_hash_' + Date.now(),
+          created_at: Date.now(),
+          type: 'single_purchase'
+        };
+
+        console.log('📡 Emitting test activity event:', testActivity);
+        io.emit('activity.append', testActivity);
+        console.log('✅ Test activity event emitted');
+        res.json({ success: true, activity: testActivity });
+      });
    }
 
    return router;

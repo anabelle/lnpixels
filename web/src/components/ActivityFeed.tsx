@@ -10,23 +10,48 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ collapsed, onToggle }) => {
   const { activities, loading, error } = useActivity();
 
   const formatTimeAgo = (timestamp: number) => {
-    const now = Date.now();
-    const diff = now - timestamp;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
+    try {
+      // Validate timestamp
+      if (!timestamp || isNaN(timestamp) || timestamp <= 0) {
+        return 'Unknown time';
+      }
 
-    if (days > 0) return `${days}d ago`;
-    if (hours > 0) return `${hours}h ago`;
-    if (minutes > 0) return `${minutes}m ago`;
-    return 'Just now';
+      const now = Date.now();
+      const diff = now - timestamp;
+
+      // Handle negative timestamps (future dates)
+      if (diff < 0) {
+        return 'Just now';
+      }
+
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
+
+      if (days > 0) return `${days}d ago`;
+      if (hours > 0) return `${hours}h ago`;
+      if (minutes > 0) return `${minutes}m ago`;
+      return 'Just now';
+    } catch (error) {
+      console.error('Error formatting time:', error, timestamp);
+      return 'Unknown time';
+    }
   };
 
   const formatActivityText = (activity: any) => {
-    if (activity.type === 'bulk_purchase') {
-      return `Rectangle purchased (${activity.x}, ${activity.y})`;
+    try {
+      const x = activity.x || 0;
+      const y = activity.y || 0;
+      const letter = activity.letter;
+
+      if (activity.type === 'bulk_purchase') {
+        return `Rectangle purchased (${x}, ${y})`;
+      }
+      return `Pixel (${x}, ${y}) ${letter ? `with "${letter}" ` : ''}purchased`;
+    } catch (error) {
+      console.error('Error formatting activity text:', error, activity);
+      return 'Unknown activity';
     }
-    return `Pixel (${activity.x}, ${activity.y}) ${activity.letter ? `with "${activity.letter}" ` : ''}purchased`;
   };
 
   return (
@@ -78,21 +103,35 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ collapsed, onToggle }) => {
               </div>
             )}
 
-            {!loading && !error && activities.map((activity) => (
-              <div key={`${activity.payment_hash}-${activity.x}-${activity.y}`} className="activity-item" role="article">
-                <div className="activity-content">
-                  <span className="activity-text">
-                    {formatActivityText(activity)}
-                  </span>
-                  <time
-                    className="activity-time"
-                    dateTime={new Date(activity.created_at).toISOString()}
-                  >
-                    {formatTimeAgo(activity.created_at)}
-                  </time>
+            {!loading && !error && activities.map((activity) => {
+              // Validate activity data
+              if (!activity || typeof activity !== 'object') {
+                console.warn('Invalid activity data:', activity);
+                return null;
+              }
+
+              const key = `${activity.payment_hash || 'unknown'}-${activity.x || 0}-${activity.y || 0}`;
+
+              return (
+                <div key={key} className="activity-item" role="article">
+                  <div className="activity-content">
+                    <span className="activity-text">
+                      {formatActivityText(activity)}
+                    </span>
+                    <time
+                      className="activity-time"
+                      dateTime={
+                        activity.created_at && !isNaN(activity.created_at) && activity.created_at > 0
+                          ? new Date(activity.created_at).toISOString()
+                          : new Date().toISOString()
+                      }
+                    >
+                      {formatTimeAgo(activity.created_at)}
+                    </time>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            }).filter(Boolean)}
           </div>
         </div>
       )}

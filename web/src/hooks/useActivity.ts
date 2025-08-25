@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useSocket } from './useSocket';
 
 export interface ActivityItem {
   id?: number;
@@ -18,7 +17,6 @@ export const useActivity = () => {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const socket = useSocket();
 
   // Fetch initial activity data
   const fetchActivities = async (limit = 20) => {
@@ -29,6 +27,7 @@ export const useActivity = () => {
         throw new Error('Failed to fetch activities');
       }
       const data = await response.json();
+      console.log('Fetched activities from API:', data.events);
       setActivities(data.events || []);
       setError(null);
     } catch (err) {
@@ -39,21 +38,37 @@ export const useActivity = () => {
     }
   };
 
-  // Listen for real-time activity updates
+  // Listen for real-time activity updates via custom events
   useEffect(() => {
-    if (!socket) return;
+    console.log('🎧 Setting up activity update listener');
 
-    const handleActivityUpdate = (activity: ActivityItem) => {
-      console.log('Received activity update:', activity);
-      setActivities(prev => [activity, ...prev.slice(0, 19)]); // Keep only 20 most recent
+    const handleActivityUpdate = (event: CustomEvent<ActivityItem>) => {
+      try {
+        const activity = event.detail;
+        console.log('🎉 Received activity update via custom event:', activity);
+        console.log('Activity created_at:', activity.created_at, typeof activity.created_at);
+
+        // Validate the activity data
+        if (!activity || typeof activity.created_at !== 'number' || isNaN(activity.created_at)) {
+          console.error('❌ Invalid activity data received:', activity);
+          return;
+        }
+
+        console.log('✅ Adding activity to state');
+        setActivities(prev => [activity, ...prev.slice(0, 19)]); // Keep only 20 most recent
+      } catch (error) {
+        console.error('❌ Error handling activity update:', error);
+      }
     };
 
-    socket.on('activity.append', handleActivityUpdate);
+    window.addEventListener('activityUpdate', handleActivityUpdate as EventListener);
+    console.log('✅ Activity update listener set up');
 
     return () => {
-      socket.off('activity.append', handleActivityUpdate);
+      window.removeEventListener('activityUpdate', handleActivityUpdate as EventListener);
+      console.log('🗑️ Activity update listener removed');
     };
-  }, [socket]);
+  }, []);
 
   // Fetch activities on mount
   useEffect(() => {

@@ -30,6 +30,8 @@ export function usePixels(): UsePixelsResult {
   const [error, setError] = useState<string | null>(null);
   const { viewport } = useViewportContext();
 
+  console.log('🔧 usePixels hook initialized');
+
   // Throttling state
   const lastFetchTime = useRef<number>(0);
   const throttleTimeout = useRef<NodeJS.Timeout | null>(null);
@@ -115,6 +117,7 @@ export function usePixels(): UsePixelsResult {
 
   // Setup WebSocket connection for real-time updates
   useEffect(() => {
+    console.log('🔌 Setting up WebSocket connection...');
     // Connect to the backend WebSocket server
     // Vite proxy handles the connection in development
     socketRef.current = io('/api', {
@@ -124,7 +127,17 @@ export function usePixels(): UsePixelsResult {
     const socket = socketRef.current;
 
     socket.on('connect', () => {
-      console.log('Connected to WebSocket server');
+      console.log('✅ Connected to WebSocket server');
+      console.log('Socket ID:', socket.id);
+      console.log('Socket connected:', socket.connected);
+    });
+
+    socket.on('connect_error', (error) => {
+      console.error('❌ WebSocket connection error:', error);
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('🔌 Disconnected from WebSocket server:', reason);
     });
 
     socket.on('disconnect', () => {
@@ -135,24 +148,41 @@ export function usePixels(): UsePixelsResult {
     socket.on('pixel.update', (updatedPixel: Pixel) => {
       console.log('Received pixel update via WebSocket:', updatedPixel);
 
-      setPixels(currentPixels => {
-        const existingIndex = currentPixels.findIndex(p => p.x === updatedPixel.x && p.y === updatedPixel.y);
+      try {
+        setPixels(currentPixels => {
+          const existingIndex = currentPixels.findIndex(p => p.x === updatedPixel.x && p.y === updatedPixel.y);
 
-        if (existingIndex >= 0) {
-          // Update existing pixel
-          const newPixels = [...currentPixels];
-          newPixels[existingIndex] = updatedPixel;
-          return newPixels;
-        } else {
-          // Add new pixel
-          return [...currentPixels, updatedPixel];
-        }
-      });
+          if (existingIndex >= 0) {
+            // Update existing pixel
+            const newPixels = [...currentPixels];
+            newPixels[existingIndex] = updatedPixel;
+            return newPixels;
+          } else {
+            // Add new pixel
+            return [...currentPixels, updatedPixel];
+          }
+        });
+      } catch (error) {
+        console.error('Error updating pixels:', error);
+      }
     });
 
     socket.on('activity.append', (activity) => {
-      console.log('Received activity update via WebSocket:', activity);
-      // Activity updates are handled by the ActivityFeed component
+      console.log('🔥 RECEIVED activity.append via WebSocket:', activity);
+      console.log('Activity data type check:', typeof activity, activity);
+      try {
+        // Validate activity data before dispatching
+        if (!activity || typeof activity.created_at !== 'number' || isNaN(activity.created_at)) {
+          console.error('Invalid activity data from WebSocket:', activity);
+          return;
+        }
+
+        // Emit custom event for activity updates that can be listened to by other components
+        window.dispatchEvent(new CustomEvent('activityUpdate', { detail: activity }));
+        console.log('Successfully dispatched activity update event');
+      } catch (error) {
+        console.error('Error dispatching activity update:', error);
+      }
     });
 
     socket.on('connect_error', (error) => {
