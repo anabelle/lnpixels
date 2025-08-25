@@ -14,17 +14,22 @@ const BASE_PRICES = {
 
 // Price calculation function implementing design.md rules
 export function price(options: PricingOptions): number {
-  // Overwrite rule: 2x last sold price for any type
-  if (options.lastPrice !== null) {
-    return options.lastPrice * 2;
+  // Determine base price for the new pixel type
+  let basePrice: number;
+  if (options.color && options.letter) {
+    basePrice = BASE_PRICES.letter;
+  } else if (options.color) {
+    basePrice = BASE_PRICES.color;
+  } else {
+    basePrice = BASE_PRICES.basic;
   }
 
-  // Base pricing rules
-  if (options.color && options.letter) {
-    return BASE_PRICES.letter;
-  } else if (options.color) {
-    return BASE_PRICES.color;
-  } else {
-    return BASE_PRICES.basic;
+  // Overwrite rule: charge the maximum of (2x last sold price, base price for new pixel type)
+  if (options.lastPrice !== null) {
+    const doubleLastPrice = options.lastPrice * 2;
+    return Math.max(doubleLastPrice, basePrice);
   }
+
+  // New pixel: use base price
+  return basePrice;
 }
