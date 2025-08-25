@@ -102,6 +102,9 @@ Thumbs.db
 .pm2/
 *.pm2
 
+# Ecosystem config (contains sensitive data)
+ecosystem.config.js
+
 # Database
 *.db
 *.db-*
