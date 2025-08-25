@@ -272,6 +272,11 @@ const Canvas: React.FC<ExtendedCanvasProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    console.log(`Canvas render: viewport at (${viewport.x.toFixed(2)}, ${viewport.y.toFixed(2)}), zoom: ${viewport.zoom.toFixed(2)}`);
+    console.log(`Rendering ${pixels.length} pixels`);
+    const pixelsWithLetters = pixels.filter(p => p.letter);
+    console.log(`Pixels with letters: ${pixelsWithLetters.length}`, pixelsWithLetters.map(p => `${p.letter}@(${p.x},${p.y})`));
+
     // Clear canvas
     ctx.clearRect(0, 0, dimensions.width, dimensions.height);
 
@@ -312,10 +317,19 @@ const Canvas: React.FC<ExtendedCanvasProps> = ({
 
       // Draw letter if present
       if (pixel.letter) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = `${0.8 / viewport.zoom}px Arial`;
+        // Use black text for better visibility on light colors, white for dark colors
+        const colorBrightness = parseInt(pixel.color.slice(1), 16);
+        const isLightColor = colorBrightness > 0x7FFFFF; // Check if color is light
+        ctx.fillStyle = isLightColor ? '#000000' : '#ffffff';
+
+        // Calculate font size to fit neatly inside the 1x1 pixel square
+        // Make it larger so it's definitely visible
+        const fontSize = Math.max(0.6, 1.2 / viewport.zoom); // Minimum 0.6 world units
+        ctx.font = `${fontSize}px Arial`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+
+        // Draw the letter centered in the pixel
         ctx.fillText(pixel.letter, pixel.x + 0.5, pixel.y + 0.5);
       }
     });

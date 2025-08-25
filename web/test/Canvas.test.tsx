@@ -292,6 +292,51 @@ describe('Canvas', () => {
       expect(secondCall.selectedRectangle.x2).toBe(10);
       expect(secondCall.selectedRectangle.y2).toBe(10);
     });
+
+    it('should render pixels with both color and letter', () => {
+      const pixels = [
+        { x: 0, y: 0, color: '#ff0000', letter: 'A', sats: 1 },
+        { x: 1, y: 0, color: '#00ff00', letter: 'B', sats: 1 },
+      ];
+
+      renderCanvas({ pixels });
+      const canvas = screen.getByRole('img', { hidden: true });
+      expect(canvas).toBeInTheDocument();
+
+      // Get the mock context
+      const mockContext = mockCanvas.getContext.mock.results[0].value;
+
+      // Verify that fillRect was called for both pixels (color background)
+      expect(mockContext.fillRect).toHaveBeenCalledWith(0, 0, 1, 1);
+      expect(mockContext.fillRect).toHaveBeenCalledWith(1, 0, 1, 1);
+
+      // Verify that fillText was called for both letters
+      expect(mockContext.fillText).toHaveBeenCalledWith('A', 0.5, 0.5);
+      expect(mockContext.fillText).toHaveBeenCalledWith('B', 1.5, 0.5);
+
+      // Verify that fillStyle was set to white for letters
+      expect(mockContext.fillStyle).toBe('#ffffff');
+    });
+
+    it('should render pixels with only color when no letter is present', () => {
+      const pixels = [
+        { x: 0, y: 0, color: '#ff0000', sats: 1 },
+        { x: 1, y: 0, color: '#00ff00', sats: 1 },
+      ];
+
+      renderCanvas({ pixels });
+      const canvas = screen.getByRole('img', { hidden: true });
+      expect(canvas).toBeInTheDocument();
+
+      // Get the mock context
+      const mockContext = mockCanvas.getContext.mock.results[0].value;
+
+      // Verify that fillRect was called for both pixels
+      expect(mockContext.fillRect).toHaveBeenCalledWith(0, 0, 1, 1);
+      expect(mockContext.fillRect).toHaveBeenCalledWith(1, 0, 1, 1);
+
+      // Verify that fillText was NOT called since no letters
+      expect(mockContext.fillText).not.toHaveBeenCalled();
+    });
   });
 });
- });

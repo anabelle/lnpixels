@@ -10,21 +10,48 @@ const router = Router();
 
 // In-memory storage for pixels (will be replaced with database later)
 export let pixels: any[] = [
+  // "HELLO" word in rainbow colors
   { x: 0, y: 0, color: '#ff0000', letter: 'H', sats: 100, created_at: Date.now() },
   { x: 1, y: 0, color: '#00ff00', letter: 'E', sats: 10, created_at: Date.now() },
   { x: 2, y: 0, color: '#0000ff', letter: 'L', sats: 1, created_at: Date.now() },
   { x: 3, y: 0, color: '#ffff00', letter: 'L', sats: 100, created_at: Date.now() },
   { x: 4, y: 0, color: '#ff00ff', letter: 'O', sats: 10, created_at: Date.now() },
-  { x: 0, y: 1, color: '#00ffff', sats: 1, created_at: Date.now() },
-  { x: 1, y: 1, color: '#ff8000', sats: 10, created_at: Date.now() },
-  { x: 2, y: 1, color: '#8000ff', sats: 100, created_at: Date.now() },
+
+  // Mixed colors with and without letters
+  { x: 0, y: 1, color: '#00ffff', letter: 'L', sats: 1, created_at: Date.now() },
+  { x: 1, y: 1, color: '#ff8000', letter: 'N', sats: 10, created_at: Date.now() },
+  { x: 2, y: 1, color: '#8000ff', letter: 'P', sats: 100, created_at: Date.now() },
   { x: 3, y: 1, color: '#0080ff', sats: 1, created_at: Date.now() },
-  { x: 4, y: 1, color: '#ff0080', sats: 10, created_at: Date.now() },
+  { x: 4, y: 1, color: '#ff0080', letter: 'X', sats: 10, created_at: Date.now() },
+
+  // "WORLD" word in different colors
   { x: -2, y: -1, color: '#00ff80', letter: 'W', sats: 100, created_at: Date.now() },
   { x: -1, y: -1, color: '#80ff00', letter: 'O', sats: 10, created_at: Date.now() },
   { x: 0, y: -1, color: '#ff0080', letter: 'R', sats: 1, created_at: Date.now() },
   { x: 1, y: -1, color: '#8000ff', letter: 'L', sats: 100, created_at: Date.now() },
   { x: 2, y: -1, color: '#0080ff', letter: 'D', sats: 10, created_at: Date.now() },
+
+  // Additional demo pixels with letters on different colored backgrounds
+  { x: -3, y: 2, color: '#ffffff', letter: 'A', sats: 100, created_at: Date.now() }, // White background
+  { x: -2, y: 2, color: '#000000', letter: 'B', sats: 10, created_at: Date.now() },  // Black background
+  { x: -1, y: 2, color: '#ff4500', letter: 'C', sats: 1, created_at: Date.now() },   // Orange background
+  { x: 0, y: 2, color: '#32cd32', letter: 'D', sats: 100, created_at: Date.now() },  // Lime green background
+  { x: 1, y: 2, color: '#9370db', letter: 'E', sats: 10, created_at: Date.now() },   // Medium purple background
+  { x: 2, y: 2, color: '#ffd700', letter: 'F', sats: 1, created_at: Date.now() },    // Gold background
+  { x: 3, y: 2, color: '#00ced1', letter: 'G', sats: 100, created_at: Date.now() },  // Dark turquoise background
+
+  // "TEST" word diagonally
+  { x: 5, y: 3, color: '#dc143c', letter: 'T', sats: 10, created_at: Date.now() },   // Crimson background
+  { x: 6, y: 4, color: '#4169e1', letter: 'E', sats: 1, created_at: Date.now() },    // Royal blue background
+  { x: 7, y: 5, color: '#228b22', letter: 'S', sats: 100, created_at: Date.now() },  // Forest green background
+  { x: 8, y: 6, color: '#8a2be2', letter: 'T', sats: 10, created_at: Date.now() },   // Blue violet background
+
+  // Single letters on various backgrounds to test visibility
+  { x: -5, y: -3, color: '#f0f8ff', letter: 'Z', sats: 1, created_at: Date.now() },  // Alice blue background
+  { x: -4, y: -3, color: '#fff8dc', letter: 'Y', sats: 10, created_at: Date.now() },  // Cream background
+  { x: -3, y: -3, color: '#e6e6fa', letter: 'X', sats: 100, created_at: Date.now() }, // Lavender background
+  { x: -2, y: -3, color: '#ffe4e1', letter: 'W', sats: 1, created_at: Date.now() },   // Misty rose background
+  { x: -1, y: -3, color: '#f5f5f5', letter: 'V', sats: 10, created_at: Date.now() },  // White smoke background
 ];
 
 // Initialize payments adapter
@@ -295,12 +322,21 @@ export function setupRoutes(io: Namespace) {
     }
   });
 
-  // Example endpoint to simulate pixel update (for testing)
-  router.post('/test-update', (req, res) => {
-    const pixelData = { x: 10, y: 20, color: '#ff0000', letter: 'A', sats: 100, created_at: Date.now() };
-    io.emit('pixel.update', pixelData);
-    res.json({ success: true });
-  });
+   // Example endpoint to simulate pixel update (for testing)
+   router.post('/test-update', (req, res) => {
+     const pixelData = { x: 10, y: 20, color: '#ff0000', letter: 'A', sats: 100, created_at: Date.now() };
+
+     // Actually save the pixel to the array (like the webhook does)
+     const existingIndex = pixels.findIndex(p => p.x === pixelData.x && p.y === pixelData.y);
+     if (existingIndex >= 0) {
+       pixels[existingIndex] = pixelData;
+     } else {
+       pixels.push(pixelData);
+     }
+
+     io.emit('pixel.update', pixelData);
+     res.json({ success: true, pixel: pixelData });
+   });
 
   return router;
 }

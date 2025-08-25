@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Canvas Letter Test</title>
+</head>
+<body>
+    <h1>Canvas Letter Rendering Test</h1>
+    <canvas id="testCanvas" width="400" height="400" style="border: 1px solid black;"></canvas>
+    <script>
+        const canvas = document.getElementById('testCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Test different color backgrounds with letters
+        const testPixels = [
+            { x: 10, y: 10, color: '#ff0000', letter: 'A' }, // Red background
+            { x: 30, y: 10, color: '#00ff00', letter: 'B' }, // Green background
+            { x: 50, y: 10, color: '#0000ff', letter: 'C' }, // Blue background
+            { x: 70, y: 10, color: '#ffff00', letter: 'D' }, // Yellow background (light)
+            { x: 90, y: 10, color: '#ffffff', letter: 'E' }, // White background (very light)
+            { x: 10, y: 30, color: '#000000', letter: 'F' }, // Black background (dark)
+        ];
+
+        testPixels.forEach(pixel => {
+            // Draw pixel background
+            ctx.fillStyle = pixel.color;
+            ctx.fillRect(pixel.x, pixel.y, 20, 20);
+
+            // Draw letter with improved visibility
+            const colorBrightness = parseInt(pixel.color.slice(1), 16);
+            const isLightColor = colorBrightness > 0x7FFFFF;
+            ctx.fillStyle = isLightColor ? '#000000' : '#ffffff';
+
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(pixel.letter, pixel.x + 10, pixel.y + 10);
+        });
+
+        console.log('Canvas test rendered. Check if letters are visible on all backgrounds.');
+    </script>
+</body>
+</html>
