@@ -530,6 +530,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  position: relative;
+  padding-right: 4rem; /* Make space for the price pill */
 }
 
 .activity-text {
@@ -542,6 +544,36 @@ body {
   font-size: 0.8rem;
   color: var(--text-secondary);
   transition: color 0.3s ease;
+}
+
+.activity-price {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  background: #ff6b35;
+  color: white;
+  border-radius: 12px;
+  margin-left: auto;
+  align-self: flex-start;
+  white-space: nowrap;
+  transition: background-color 0.3s ease;
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.activity-price:hover {
+  background: #e55a2b;
+}
+
+.dark .activity-price {
+  background: #ff6b35;
+  color: white;
+}
+
+.dark .activity-price:hover {
+  background: #e55a2b;
 }
 
 /* Mobile Layout */

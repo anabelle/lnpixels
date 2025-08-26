@@ -2,8 +2,14 @@
   "name": "lnpixels",
   "version": "1.0.0",
   "description": "LNPixels project",
-  "workspaces": ["api", "web"],
+  "workspaces": [
+    "api",
+    "web"
+  ],
   "scripts": {
     "test": "npm run test -w api && npm run test -w web"
+  },
+  "devDependencies": {
+    "happy-dom": "^18.0.1"
   }
 }
