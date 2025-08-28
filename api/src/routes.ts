@@ -79,8 +79,8 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
          return res.status(400).json({ error: 'Invalid coordinates' });
        }
 
-       // Ensure color is provided (default to white for basic pixels)
-       const pixelColor = color || '#ffffff';
+         // Ensure color is provided (default to black for basic pixels)
+         const pixelColor = color || '#000000';
 
        // Find existing pixel to get last price
        const existingPixel = database.getPixel(x, y);
@@ -133,8 +133,8 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
           return res.status(400).json({ error: 'Too many letters for rectangle size' });
         }
 
-        // Ensure color is provided (default to white for basic pixels)
-        const pixelColor = color || '#ffffff';
+        // Ensure color is provided (default to black for basic pixels)
+        const pixelColor = color || '#000000';
 
       // Calculate total price
       let totalPrice = 0;
@@ -225,31 +225,31 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
          if (metadata.pixelUpdates) {
             // Bulk payment - use database bulk upsert
-            const pixelData = metadata.pixelUpdates.map((update: any) => ({
-              x: update.x,
-              y: update.y,
-              color: update.color || '#ffffff', // Default to white for basic pixels
-              letter: update.letter,
-              sats: update.price
-            }));
+             const pixelData = metadata.pixelUpdates.map((update: any) => ({
+               x: update.x,
+               y: update.y,
+               color: update.color || '#000000', // Default to black for basic pixels
+               letter: update.letter,
+               sats: update.price
+             }));
 
             try {
               const savedPixels = database.upsertPixels(pixelData);
 
                // Insert activity records for bulk purchase
                const timestamp = Date.now();
-               const activityRecords = metadata.pixelUpdates.map((update: any) =>
-                 database.insertActivity({
-                   x: update.x,
-                   y: update.y,
-                   color: update.color || '#ffffff', // Default to white for basic pixels
-                   letter: update.letter,
-                   sats: update.price,
-                   payment_hash: paymentId,
-                   created_at: timestamp,
-                   type: 'bulk_purchase'
-                 })
-               );
+                const activityRecords = metadata.pixelUpdates.map((update: any) =>
+                  database.insertActivity({
+                    x: update.x,
+                    y: update.y,
+                    color: update.color || '#000000', // Default to black for basic pixels
+                    letter: update.letter,
+                    sats: update.price,
+                    payment_hash: paymentId,
+                    created_at: timestamp,
+                    type: 'bulk_purchase'
+                  })
+                );
 
               console.log('Created bulk activity records:', activityRecords);
 
@@ -276,26 +276,26 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
           } else {
             // Single pixel payment - use database upsert
              try {
-               const savedPixel = database.upsertPixel({
-                 x: metadata.x,
-                 y: metadata.y,
-                 color: metadata.color || '#ffffff', // Default to white for basic pixels
-                 letter: metadata.letter,
-                 sats: payload.amount
-               });
+                const savedPixel = database.upsertPixel({
+                  x: metadata.x,
+                  y: metadata.y,
+                  color: metadata.color || '#000000', // Default to black for basic pixels
+                  letter: metadata.letter,
+                  sats: payload.amount
+                });
 
                // Insert activity record for single purchase
                const timestamp = Date.now();
-               const activityRecord = database.insertActivity({
-                 x: metadata.x,
-                 y: metadata.y,
-                 color: metadata.color || '#ffffff', // Default to white for basic pixels
-                 letter: metadata.letter,
-                 sats: payload.amount,
-                 payment_hash: paymentId,
-                 created_at: timestamp,
-                type: 'single_purchase'
-              });
+                const activityRecord = database.insertActivity({
+                  x: metadata.x,
+                  y: metadata.y,
+                  color: metadata.color || '#000000', // Default to black for basic pixels
+                  letter: metadata.letter,
+                  sats: payload.amount,
+                  payment_hash: paymentId,
+                  created_at: timestamp,
+                 type: 'single_purchase'
+               });
 
               console.log('Created activity record:', activityRecord);
 

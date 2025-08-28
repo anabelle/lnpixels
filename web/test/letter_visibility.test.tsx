@@ -49,8 +49,8 @@ describe('Letter Visibility Test', () => {
   it('should render letters with proper visibility', () => {
     const pixels = [
       { x: 0, y: 0, color: '#ff0000', letter: 'A', sats: 100 },
-      { x: 1, y: 0, color: '#ffffff', letter: 'B', sats: 10 }, // White background
-      { x: 2, y: 0, color: '#000000', letter: 'C', sats: 1 },  // Black background
+      { x: 1, y: 0, color: '#000000', letter: 'B', sats: 10 }, // Black background (default)
+      { x: 2, y: 0, color: '#ffffff', letter: 'C', sats: 1 },  // White background
     ];
 
     render(
