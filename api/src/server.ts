@@ -24,6 +24,17 @@ console.log('Database initialized with', db.getPixelCount(), 'existing pixels');
 const { server, io } = setupSocket(app);
 
 // Setup routes - mount at /api prefix
-app.use('/api', setupRoutes(io, db));
+try {
+  app.use('/api', setupRoutes(io, db));
+  console.log('Routes setup successfully');
+} catch (error) {
+  console.error('Error setting up routes:', error);
+  process.exit(1);
+}
 
-server.listen(3000, () => console.log('Server running on port 3000'));
+try {
+  server.listen(3000, '0.0.0.0', () => console.log('Server running on port 3000'));
+} catch (error) {
+  console.error('Error starting server:', error);
+  process.exit(1);
+}

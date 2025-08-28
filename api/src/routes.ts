@@ -74,24 +74,27 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
     try {
       const { x, y, color, letter } = req.body;
 
-      // Validate input
-      if (typeof x !== 'number' || typeof y !== 'number') {
-        return res.status(400).json({ error: 'Invalid coordinates' });
-      }
+       // Validate input
+       if (typeof x !== 'number' || typeof y !== 'number') {
+         return res.status(400).json({ error: 'Invalid coordinates' });
+       }
+
+       // Ensure color is provided (default to white for basic pixels)
+       const pixelColor = color || '#ffffff';
 
        // Find existing pixel to get last price
        const existingPixel = database.getPixel(x, y);
        const lastPrice = existingPixel ? existingPixel.sats : null;
 
-      // Calculate price
-      const pixelPrice = price({ color, letter, lastPrice });
+       // Calculate price
+       const pixelPrice = price({ color: pixelColor, letter, lastPrice });
 
-      // Create invoice
-      const invoice = await paymentsAdapter.createInvoice(
-        pixelPrice,
-        `Pixel purchase: (${x}, ${y})`,
-        { x, y, color, letter }
-      );
+       // Create invoice
+       const invoice = await paymentsAdapter.createInvoice(
+         pixelPrice,
+         `Pixel purchase: (${x}, ${y})`,
+         { x, y, color: pixelColor, letter }
+       );
 
        res.json({
          invoice: invoice.invoice,
@@ -125,10 +128,13 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
          return res.status(413).json({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'Rectangle size exceeds maximum of 1000 pixels' } });
        }
 
-       // Validate letters length
-       if (letters && letters.length > totalPixels) {
-         return res.status(400).json({ error: 'Too many letters for rectangle size' });
-       }
+        // Validate letters length
+        if (letters && letters.length > totalPixels) {
+          return res.status(400).json({ error: 'Too many letters for rectangle size' });
+        }
+
+        // Ensure color is provided (default to white for basic pixels)
+        const pixelColor = color || '#ffffff';
 
       // Calculate total price
       let totalPrice = 0;
@@ -138,10 +144,10 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
          for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
            const existingPixel = database.getPixel(x, y);
            const lastPrice = existingPixel ? existingPixel.sats : null;
-           const pixelPrice = price({ color, letter: null, lastPrice });
-           totalPrice += pixelPrice;
+            const pixelPrice = price({ color: pixelColor, letter: null, lastPrice });
+            totalPrice += pixelPrice;
 
-           pixelUpdates.push({ x, y, color, letter: null, price: pixelPrice });
+            pixelUpdates.push({ x, y, color: pixelColor, letter: null, price: pixelPrice });
          }
        }
 
@@ -153,8 +159,8 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
              if (letterIndex < letters.length) {
                const existingPixel = database.getPixel(x, y);
                const lastPrice = existingPixel ? existingPixel.sats : null;
-               const pixelPrice = price({ color, letter: letters[letterIndex], lastPrice });
-               totalPrice += (pixelPrice - price({ color, letter: null, lastPrice })); // Add letter premium
+                const pixelPrice = price({ color: pixelColor, letter: letters[letterIndex], lastPrice });
+                totalPrice += (pixelPrice - price({ color: pixelColor, letter: null, lastPrice })); // Add letter premium
                pixelUpdates.find(p => p.x === x && p.y === y)!.letter = letters[letterIndex];
                letterIndex++;
              }
@@ -162,12 +168,12 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
          }
        }
 
-      // Create bulk invoice
-      const invoice = await paymentsAdapter.createInvoice(
-        totalPrice,
-        `Bulk pixel purchase: ${totalPixels} pixels`,
-        { x1, y1, x2, y2, color, letters, pixelUpdates }
-      );
+       // Create bulk invoice
+       const invoice = await paymentsAdapter.createInvoice(
+         totalPrice,
+         `Bulk pixel purchase: ${totalPixels} pixels`,
+         { x1, y1, x2, y2, color: pixelColor, letters, pixelUpdates }
+       );
 
        res.json({
          invoice: invoice.invoice,
@@ -218,32 +224,32 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         const metadata = payload.metadata;
 
          if (metadata.pixelUpdates) {
-           // Bulk payment - use database bulk upsert
-           const pixelData = metadata.pixelUpdates.map((update: any) => ({
-             x: update.x,
-             y: update.y,
-             color: update.color,
-             letter: update.letter,
-             sats: update.price
-           }));
+            // Bulk payment - use database bulk upsert
+            const pixelData = metadata.pixelUpdates.map((update: any) => ({
+              x: update.x,
+              y: update.y,
+              color: update.color || '#ffffff', // Default to white for basic pixels
+              letter: update.letter,
+              sats: update.price
+            }));
 
             try {
               const savedPixels = database.upsertPixels(pixelData);
 
-              // Insert activity records for bulk purchase
-              const timestamp = Date.now();
-              const activityRecords = metadata.pixelUpdates.map((update: any) =>
-                database.insertActivity({
-                  x: update.x,
-                  y: update.y,
-                  color: update.color,
-                  letter: update.letter,
-                  sats: update.price,
-                  payment_hash: paymentId,
-                  created_at: timestamp,
-                  type: 'bulk_purchase'
-                })
-              );
+               // Insert activity records for bulk purchase
+               const timestamp = Date.now();
+               const activityRecords = metadata.pixelUpdates.map((update: any) =>
+                 database.insertActivity({
+                   x: update.x,
+                   y: update.y,
+                   color: update.color || '#ffffff', // Default to white for basic pixels
+                   letter: update.letter,
+                   sats: update.price,
+                   payment_hash: paymentId,
+                   created_at: timestamp,
+                   type: 'bulk_purchase'
+                 })
+               );
 
               console.log('Created bulk activity records:', activityRecords);
 
@@ -267,27 +273,27 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
               console.error('Error saving bulk pixels to database:', error);
               return res.status(500).json({ error: 'Failed to save pixels' });
             }
-         } else {
-           // Single pixel payment - use database upsert
-            try {
-              const savedPixel = database.upsertPixel({
-                x: metadata.x,
-                y: metadata.y,
-                color: metadata.color,
-                letter: metadata.letter,
-                sats: payload.amount
-              });
+          } else {
+            // Single pixel payment - use database upsert
+             try {
+               const savedPixel = database.upsertPixel({
+                 x: metadata.x,
+                 y: metadata.y,
+                 color: metadata.color || '#ffffff', // Default to white for basic pixels
+                 letter: metadata.letter,
+                 sats: payload.amount
+               });
 
-              // Insert activity record for single purchase
-              const timestamp = Date.now();
-              const activityRecord = database.insertActivity({
-                x: metadata.x,
-                y: metadata.y,
-                color: metadata.color,
-                letter: metadata.letter,
-                sats: payload.amount,
-                payment_hash: paymentId,
-                created_at: timestamp,
+               // Insert activity record for single purchase
+               const timestamp = Date.now();
+               const activityRecord = database.insertActivity({
+                 x: metadata.x,
+                 y: metadata.y,
+                 color: metadata.color || '#ffffff', // Default to white for basic pixels
+                 letter: metadata.letter,
+                 sats: payload.amount,
+                 payment_hash: paymentId,
+                 created_at: timestamp,
                 type: 'single_purchase'
               });
 
