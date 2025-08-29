@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTheme } from '../theme';
+import SocialLinks from './SocialLinks';
 
 interface HeaderProps {
   urlState?: {
@@ -32,9 +33,7 @@ const Header: React.FC<HeaderProps> = ({ urlState }) => {
       <div className="header-content">
         <h1 className="brand">LNPixels</h1>
         <nav className="nav" aria-label="Main navigation">
-          <button className="nav-button" aria-label="Go to canvas">Canvas</button>
-          <button className="nav-button" aria-label="View activity feed">Activity</button>
-          <button className="nav-button" aria-label="Get help">Help</button>
+          <SocialLinks size="sm" />
         </nav>
         <div className="header-controls" aria-label="Canvas information and controls">
           <span className="coordinates" aria-label="Current coordinates">
