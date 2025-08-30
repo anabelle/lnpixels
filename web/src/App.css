@@ -228,6 +228,30 @@ body {
   color: var(--text-secondary);
 }
 
+.coordinates,
+.zoom {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: var(--bg-tertiary);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: fit-content;
+}
+
+.coordinates:hover,
+.zoom:hover {
+  background: var(--bg-secondary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
 .theme-toggle {
   background: none;
   border: none;
@@ -1809,6 +1833,14 @@ body {
     height: 28px;
     font-size: 0.9rem;
     margin-right: 0.25rem;
+  }
+
+  /* Make coordinates and zoom more compact on mobile */
+  .coordinates,
+  .zoom {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.4rem;
+    min-width: auto;
   }
 }
 
