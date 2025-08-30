@@ -8,9 +8,10 @@ interface HeaderProps {
     y: number;
     z: number;
   };
+  onShowWelcome?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ urlState }) => {
+const Header: React.FC<HeaderProps> = ({ urlState, onShowWelcome }) => {
   const { actualTheme, toggleTheme } = useTheme();
 
   // Format coordinates and zoom for display
@@ -42,6 +43,16 @@ const Header: React.FC<HeaderProps> = ({ urlState }) => {
           <span className="zoom" aria-label="Current zoom level">
             {formatZoom(displayZoom)}
           </span>
+          {onShowWelcome && (
+            <button
+              className="help-button"
+              onClick={onShowWelcome}
+              aria-label="Show welcome tutorial"
+              title="How does this work?"
+            >
+              ?
+            </button>
+          )}
           <button
             className="theme-toggle"
             onClick={toggleTheme}
