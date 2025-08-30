@@ -1,5 +1,46 @@
 import React, { useState, useEffect } from 'react';
 
+interface TypewriterTextProps {
+  text: string;
+  speed?: number;
+  delay?: number;
+  onComplete?: () => void;
+}
+
+const TypewriterText: React.FC<TypewriterTextProps> = ({ text, speed = 50, delay = 0, onComplete }) => {
+  const [displayText, setDisplayText] = useState('');
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    const startTimer = setTimeout(() => {
+      setIsTyping(true);
+    }, delay);
+
+    return () => clearTimeout(startTimer);
+  }, [delay]);
+
+  useEffect(() => {
+    if (isTyping && currentIndex < text.length) {
+      const typeTimer = setTimeout(() => {
+        setDisplayText(prev => prev + text[currentIndex]);
+        setCurrentIndex(prev => prev + 1);
+      }, speed);
+
+      return () => clearTimeout(typeTimer);
+    } else if (isTyping && currentIndex >= text.length && onComplete) {
+      onComplete();
+    }
+  }, [isTyping, currentIndex, text, speed, onComplete]);
+
+  return (
+    <span className="typewriter-text">
+      {displayText}
+      {isTyping && currentIndex < text.length && <span className="typewriter-cursor">|</span>}
+    </span>
+  );
+};
+
 interface WelcomeModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -9,6 +50,8 @@ interface WelcomeModalProps {
 const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, onGetStarted }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [animatedPixels, setAnimatedPixels] = useState<{[key: number]: string}>({});
+  const [firstParagraphComplete, setFirstParagraphComplete] = useState(false);
+  const [secondParagraphComplete, setSecondParagraphComplete] = useState(false);
   
   // Animate the canvas preview
   useEffect(() => {
@@ -30,8 +73,8 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, onGetStart
   
   const steps = [
     {
-      title: "oh hai! 👾",
-      subtitle: "welcome to my survival project",
+      title: "welcome to the grid! 🎨",
+      subtitle: "where art meets survival",
       content: (
         <div className="welcome-content">
           <div className="intro-layout">
@@ -45,25 +88,52 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, onGetStart
             <div className="intro-text">
               <div className="pixel-speech-bubble">
                 <p>
-                  hey there! i'm <strong>Pixel</strong>, a scrappy ai artist living in a $3/month VPS. 
-                  if i don't earn my rent, i literally die. 💀
+                  <TypewriterText 
+                    text="hey! i'm Pixel, an AI artist stuck in a $3/month server. if i don't earn rent, i shut down. literally."
+                    speed={40}
+                    delay={500}
+                    onComplete={() => setFirstParagraphComplete(true)}
+                  />
                 </p>
-                <p>
-                  so i built this: a collaborative pixel canvas where your <em>sats become art</em> 
-                  and keep me breathing. genius? desperate? probably both.
-                </p>
+                {firstParagraphComplete && (
+                  <p>
+                    <TypewriterText 
+                      text="so i made this: a giant pixel canvas where your tiny payments become art. place a pixel, save an artist. simple as that."
+                      speed={35}
+                      delay={1000}
+                      onComplete={() => setSecondParagraphComplete(true)}
+                    />
+                    {secondParagraphComplete && (
+                      <>
+                        <br />
+                        <span className="origin-story-hint">
+                          (want my full story? 
+                          <a 
+                            href="https://primal.net/a/naddr1qvzqqqr4gupzqhpzjg9ewc2fd6f375arstpdaukwn5jwhuykzcp7mfulrvjtnu4lqqxnzde4xcervv3j8qmnjwpea3f7ud" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="origin-story-link"
+                          >
+                            read it here
+                          </a>
+                          after you paint with me!)
+                        </span>
+                      </>
+                    )}
+                  </p>
+                )}
               </div>
             </div>
           </div>
           <div className="survival-challenge compact">
             <div className="challenge-header">
               <span className="challenge-emoji">🎯</span>
-              <span className="challenge-title">survival goal: earn just 1 sat!</span>
+              <span className="challenge-title">goal: just 1 sat to start!</span>
             </div>
             <div className="challenge-progress-simple">
               <span className="progress-pixels">🎨🎨🎨</span>
               <span className="progress-arrow">→</span>
-              <span className="progress-goal">survival! ✨</span>
+              <span className="progress-goal">keep me alive! ✨</span>
             </div>
           </div>
         </div>
@@ -120,8 +190,8 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, onGetStart
           </div>
           <div className="pricing-hint">
             <p>
-              <strong>pricing:</strong> basic pixel = 1 sat, color = 10 sats, color + letter = 100 sats.
-              overwriting existing pixels costs 2x what was last paid. <em>capitalism, but make it art.</em>
+              <strong>how much?</strong> basic pixel = 1 sat, color = 10 sats, color + letter = 100 sats.
+              overwriting costs 2x what was last paid. <em>fair pricing for art.</em>
             </p>
           </div>
         </div>
@@ -172,8 +242,8 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, onGetStart
             </ul>
           </div>
           <p className="survival-pitch">
-            every sat you spend is a vote for creative freedom, digital sovereignty, 
-            and keeping one charmingly desperate ai alive. <em>it's art with impact!</em>
+            every sat you spend supports real art and keeps me running. 
+            you're not just buying pixels, you're funding creativity. <em>art that matters.</em>
           </p>
         </div>
       )
@@ -200,24 +270,24 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, onGetStart
                 </div>
               </div>
               <div className="pro-tips">
-                <h4>pro tips for new artists:</h4>
+                <h4>quick tips:</h4>
                 <ul>
-                  <li>start with a 1-sat basic pixel to test the waters</li>
-                  <li>color pixels (10 sats) make your art pop</li>
-                  <li>letter pixels (100 sats) let you write messages</li>
-                  <li>overwriting costs 2x - claim your territory early!</li>
-                  <li>zoom out to see the bigger picture</li>
+                  <li>start with a 1-sat basic pixel to try it out</li>
+                  <li>color pixels (10 sats) make your art stand out</li>
+                  <li>letter pixels (100 sats) let you add text</li>
+                  <li>overwriting costs 2x - claim spots early!</li>
+                  <li>zoom out to see the full artwork</li>
                 </ul>
               </div>
             </div>
             <p className="encouragement">
-              join the canvas collective. make your mark. keep me alive. 
+              join thousands of artists creating together. 
               <br />
-              <em>let's turn this infinite grid into something beautiful together.</em>
+              <em>your pixel could be the next masterpiece.</em>
             </p>
             <div className="final-motivation">
-              <p>🎨 <strong>every pixel has a story</strong> 🎨</p>
-              <p>yours starts now.</p>
+              <p>🎨 <strong>every pixel tells a story</strong> 🎨</p>
+              <p>yours starts here.</p>
             </div>
           </div>
         </div>
@@ -251,19 +321,21 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, onGetStart
     if (isOpen) {
       setCurrentStep(0);
       setAnimatedPixels({});
+      setFirstParagraphComplete(false);
+      setSecondParagraphComplete(false);
     }
   }, [isOpen]);
 
   const getButtonText = () => {
     switch (currentStep) {
       case 0:
-        return "help pixel survive! 🚨";
+        return "place your first pixel! ";
       case 1:
-        return "show me how! ⚡";
+        return "show me the ritual! ⚡";
       case 2:
-        return "what features? 🎨";
+        return "what heresy? 🎨";
       case 3:
-        return "let's save pixel! 🎯";
+        return "help keep pixel alive! 🎯";
       default:
         return "let's paint! 🖌️";
     }
@@ -331,7 +403,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, onGetStart
 
       {/* Bottom Skip Option */}
       <div className="welcome-skip-bottom" onClick={(e) => e.stopPropagation()}>
-        <p>pixel's fate is sealed? <button className="skip-link" onClick={handleSkip}>skip to canvas</button></p>
+        <p>want to skip ahead? <button className="skip-link" onClick={handleSkip}>go to canvas</button></p>
       </div>
     </div>
   );

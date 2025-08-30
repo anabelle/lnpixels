@@ -2971,7 +2971,65 @@ body {
   }
 }
 
-/* Pixel Steps 2x2 Grid */
+/* Typewriter Effect */
+.typewriter-text {
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  color: var(--text-primary);
+}
+
+.typewriter-cursor {
+  animation: blink 1s infinite;
+  color: var(--accent-primary);
+  font-weight: bold;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Origin Story Link */
+.origin-story-hint {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #6b7280);
+  font-style: italic;
+  opacity: 0.7;
+  line-height: 1.4;
+}
+
+.origin-story-link {
+  color: var(--accent-primary, #3b82f6);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.8rem;
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  transition: all 0.2s ease;
+  opacity: 0.8;
+  margin: 0 4px;
+}
+
+.origin-story-link:hover {
+  color: var(--accent-hover, #2563eb);
+  text-decoration: underline;
+  opacity: 1;
+}
+
+/* Dark mode specific styling for better visibility */
+@media (prefers-color-scheme: dark) {
+  .origin-story-hint {
+    color: #9ca3af;
+    opacity: 0.8;
+  }
+  
+  .origin-story-link {
+    color: #60a5fa;
+    opacity: 0.9;
+  }
+  
+  .origin-story-link:hover {
+    color: #93c5fd;
+  }
+}
 .pixel-steps-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
