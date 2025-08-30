@@ -400,11 +400,6 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, onGetStart
           </button>
         </div>
       </div>
-
-      {/* Bottom Skip Option */}
-      <div className="welcome-skip-bottom" onClick={(e) => e.stopPropagation()}>
-        <p>want to skip ahead? <button className="skip-link" onClick={handleSkip}>go to canvas</button></p>
-      </div>
     </div>
   );
 };
