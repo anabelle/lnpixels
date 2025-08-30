@@ -166,6 +166,8 @@ function AppContent() {
                 selectionState={selectionState}
                 purchasedPixels={pixels}
                 allPixels={pixels}
+                isMobile={isMobile}
+                onTabChange={setActiveTab}
               />
             )}
             {activeTab === 'activity' && <ActivityFeed />}

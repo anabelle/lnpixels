@@ -4,20 +4,24 @@ import PaymentModal from './PaymentModal';
 import { usePixelPurchase, SelectionState } from '../hooks/usePixelPurchase';
 
 interface PurchasePanelProps {
-   collapsed?: boolean;
-   onToggle?: () => void;
-   selectionState?: SelectionState;
-   purchasedPixels?: { x: number; y: number; sats: number }[];
-   allPixels?: { x: number; y: number; color?: string; letter?: string; sats: number }[];
- }
+    collapsed?: boolean;
+    onToggle?: () => void;
+    selectionState?: SelectionState;
+    purchasedPixels?: { x: number; y: number; sats: number }[];
+    allPixels?: { x: number; y: number; color?: string; letter?: string; sats: number }[];
+    isMobile?: boolean;
+    onTabChange?: (tab: string) => void;
+  }
 
 const PurchasePanel: React.FC<PurchasePanelProps> = ({
-   collapsed,
-   onToggle,
-   selectionState,
-   purchasedPixels = [],
-   allPixels = []
- }) => {
+    collapsed,
+    onToggle,
+    selectionState,
+    purchasedPixels = [],
+    allPixels = [],
+    isMobile = false,
+    onTabChange
+  }) => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
@@ -225,6 +229,10 @@ const PurchasePanel: React.FC<PurchasePanelProps> = ({
       onPaymentSuccess={(payment) => {
         console.log('Payment completed successfully:', payment);
         setPaymentError(null);
+        // Switch back to canvas tab on mobile after successful payment
+        if (isMobile && onTabChange) {
+          onTabChange('canvas');
+        }
         // The payment success will be handled by the webhook
         // which will emit real-time updates via WebSocket
       }}
