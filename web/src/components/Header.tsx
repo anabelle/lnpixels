@@ -32,7 +32,18 @@ const Header: React.FC<HeaderProps> = ({ urlState, onShowWelcome }) => {
   return (
     <header className="header" role="banner">
       <div className="header-content">
-        <h1 className="brand">LNPixels</h1>
+        <div className="brand-container">
+          <div className="pixel-logo">
+            <div className="pixel-character">
+              <div className="pixel-face">
+                <div className="pixel-eye"></div>
+                <div className="pixel-eye"></div>
+                <div className="pixel-mouth"></div>
+              </div>
+            </div>
+          </div>
+          <h1 className="brand">LNPixels</h1>
+        </div>
         <nav className="nav" aria-label="Main navigation">
           <SocialLinks size="sm" />
         </nav>

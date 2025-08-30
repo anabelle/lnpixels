@@ -144,6 +144,54 @@ body {
   transition: color 0.3s ease;
 }
 
+.brand-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pixel-logo {
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, #ff6b6b, #4ecdc4);
+  border-radius: 4px;
+  position: relative;
+  animation: pixelBounce 2s ease-in-out infinite;
+  box-shadow: 0 2px 6px rgba(78, 205, 196, 0.2);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pixel-logo .pixel-face {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.pixel-logo .pixel-eye {
+  width: 3px;
+  height: 3px;
+  background: #333;
+  border-radius: 50%;
+  animation: pixelBlink 3s ease-in-out infinite;
+}
+
+.pixel-logo .pixel-mouth {
+  width: 6px;
+  height: 3px;
+  border: 1px solid #333;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  margin-top: 1px;
+}
+
 .nav {
   display: flex;
   align-items: center;
@@ -734,6 +782,29 @@ body {
 
   .brand {
     font-size: 1.25rem;
+  }
+
+  .brand-container {
+    gap: 6px;
+  }
+
+  .pixel-logo {
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+  }
+
+  .pixel-logo .pixel-eye {
+    width: 2px;
+    height: 2px;
+  }
+
+  .pixel-logo .pixel-mouth {
+    width: 5px;
+    height: 2px;
+    border-width: 1px;
+    border-radius: 0 0 5px 5px;
+    margin-top: 1px;
   }
 
   .nav {
@@ -2016,6 +2087,8 @@ body {
   animation: pixelBounce 2s ease-in-out infinite;
   box-shadow: 0 8px 24px rgba(78, 205, 196, 0.4);
   flex-shrink: 0;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 @media (max-width: 768px) {
