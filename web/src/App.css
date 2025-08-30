@@ -1790,6 +1790,41 @@ body {
   .social-text {
     display: none; /* Hide text on mobile screens */
   }
+
+  /* Hide LNPixels text on mobile to save space */
+  .brand {
+    display: none;
+  }
+}
+
+  .social-links {
+    gap: 0.1rem;
+    padding: 0.05rem;
+  }
+
+  .social-link {
+    padding: 0.25rem;
+    min-width: 28px;
+    font-size: 0.7rem;
+  }
+
+  .social-icon {
+    font-size: 0.8em;
+  }
+
+  .social-text {
+    display: none; /* Hide text on mobile screens */
+  }
+
+  /* Hide LNPixels text on mobile to save space */
+  .brand {
+    display: none;
+  }
+
+  /* Ensure pixel logo remains visible */
+  .pixel-logo {
+    display: flex !important;
+  }
 }
 
 @media (max-width: 480px) {
