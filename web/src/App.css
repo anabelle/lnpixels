@@ -3150,6 +3150,15 @@ body {
   line-height: 1.4;
 }
 
+/* Activity Feed Pixel Indicator */
+.activity-text-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+}
+
 .origin-story-link {
   color: var(--accent-primary, #3b82f6);
   text-decoration: none;
