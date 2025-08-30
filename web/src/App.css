@@ -768,9 +768,9 @@ body {
   }
 
   .canvas-container {
-    margin-bottom: 70px; /* Account for mobile tabs */
+    margin-bottom: 48px; /* Account for mobile tabs (actual height) */
     width: 100vw;
-    height: calc(100dvh - 130px); /* Full height minus header and tabs */
+    height: calc(100dvh - 108px); /* Full height minus header (60px) and tabs (48px) */
     position: relative;
   }
 
@@ -779,7 +779,7 @@ body {
   .activity-feed:not(.collapsed) {
     position: fixed;
     top: 60px;
-    bottom: 70px;
+    bottom: 48px; /* Match actual tab height */
     left: 0;
     right: 0;
     z-index: 90;
@@ -790,7 +790,7 @@ body {
     background: var(--bg-primary);
     overflow-y: auto;
     width: 100vw;
-    height: calc(100dvh - 130px);
+    height: calc(100dvh - 108px); /* Full height minus header (60px) and tabs (48px) */
     padding: 0;
   }
 
