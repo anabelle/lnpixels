@@ -769,10 +769,19 @@ body {
     z-index: 1;
   }
 
-  .purchase-panel:not(.collapsed) .panel-section,
-  .activity-feed:not(.collapsed) .panel-section {
-    padding: 1.25rem;
-  }
+   .purchase-panel:not(.collapsed) .panel-section,
+   .activity-feed:not(.collapsed) .panel-section {
+     padding: 1.25rem;
+   }
+
+   /* Ensure purchase button is visible above mobile tabs */
+   .purchase-panel:not(.collapsed) .panel-section:last-child {
+     padding-bottom: 2rem; /* Extra padding for purchase button */
+   }
+
+   .purchase-panel:not(.collapsed) .purchase-button {
+     margin-bottom: 1rem; /* Additional margin for purchase button */
+   }
 }
 
 @media (max-width: 480px) {
