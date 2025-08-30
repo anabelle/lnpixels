@@ -48,12 +48,14 @@ const Header: React.FC<HeaderProps> = ({ urlState, onShowWelcome }) => {
           <SocialLinks size="sm" />
         </nav>
         <div className="header-controls" aria-label="Canvas information and controls">
-          <span className="coordinates" aria-label="Current coordinates">
-            {formatCoordinates(displayX, displayY)}
-          </span>
-          <span className="zoom" aria-label="Current zoom level">
-            {formatZoom(displayZoom)}
-          </span>
+          <div className="position-display" aria-label="Current position and zoom">
+            <span className="coordinates">
+              {formatCoordinates(displayX, displayY)}
+            </span>
+            <span className="zoom">
+              {formatZoom(displayZoom)}
+            </span>
+          </div>
           {onShowWelcome && (
             <button
               className="help-button"
