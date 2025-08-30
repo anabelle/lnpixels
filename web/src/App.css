@@ -1767,7 +1767,26 @@ body {
 
 @media (max-width: 480px) {
   .nav {
-    display: none; /* Hide entire nav on very small screens - shown in mobile tabs instead */
+    /* Keep social links visible on mobile but make them more compact */
+  }
+
+  .social-links {
+    gap: 0.1rem;
+    padding: 0.05rem;
+  }
+
+  .social-link {
+    padding: 0.25rem;
+    min-width: 28px;
+    font-size: 0.7rem;
+  }
+
+  .social-icon {
+    font-size: 0.8em;
+  }
+
+  .social-text {
+    display: none; /* Hide text on very small screens */
   }
 }
 
