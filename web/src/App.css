@@ -307,8 +307,8 @@ body {
   display: grid;
   grid-template-columns: 300px 1fr 250px;
   grid-template-areas: "purchase canvas activity";
-  min-height: calc(100vh - 60px);
-  max-height: calc(100vh - 60px);
+  min-height: calc(100dvh - 60px);
+  max-height: calc(100dvh - 60px);
   overflow: hidden;
   transition: grid-template-columns 0.2s ease; /* Faster transition for better UX */
 }
@@ -770,7 +770,7 @@ body {
   .canvas-container {
     margin-bottom: 70px; /* Account for mobile tabs */
     width: 100vw;
-    height: calc(100vh - 130px); /* Full height minus header and tabs */
+    height: calc(100dvh - 130px); /* Full height minus header and tabs */
     position: relative;
   }
 
@@ -790,7 +790,7 @@ body {
     background: var(--bg-primary);
     overflow-y: auto;
     width: 100vw;
-    height: calc(100vh - 130px);
+    height: calc(100dvh - 130px);
     padding: 0;
   }
 
@@ -1179,7 +1179,7 @@ body {
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   max-width: 520px;
   width: 90%;
-  max-height: 90vh;
+  max-height: 90dvh;
   overflow: hidden;
   border: 1px solid var(--border-primary);
   animation: slideIn 0.3s ease-out;
@@ -1215,7 +1215,7 @@ body {
 
 .payment-modal-content {
   padding: 2rem;
-  max-height: calc(90vh - 140px);
+  max-height: calc(90dvh - 140px);
   overflow-y: auto;
 }
 
@@ -1951,7 +1951,7 @@ body {
 
 @media (max-width: 768px) {
   .welcome-container {
-    max-height: 95vh;
+    max-height: 95dvh;
     overflow: hidden;
   }
 }
@@ -1972,7 +1972,7 @@ body {
   border-radius: 20px;
   box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.4);
   width: 100%;
-  max-height: 90vh;
+  max-height: 90dvh;
   overflow: hidden;
   border: 2px solid var(--border-primary);
   animation: welcomeSlideIn 0.5s ease-out;
@@ -1984,7 +1984,7 @@ body {
 @media (max-width: 768px) {
   .welcome-modal {
     border-radius: 12px;
-    max-height: 85vh;
+    max-height: 85dvh;
     border-width: 1px;
   }
 }
@@ -2056,7 +2056,7 @@ body {
 .welcome-body {
   padding: 6px 20px 12px;
   overflow-y: auto;
-  max-height: calc(90vh - 120px);
+  max-height: calc(90dvh - 120px);
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -2066,7 +2066,7 @@ body {
 @media (max-width: 768px) {
   .welcome-body {
     padding: 4px 14px 10px;
-    max-height: calc(85vh - 60px);
+    max-height: calc(85dvh - 60px);
   }
 }
 
@@ -3031,7 +3031,7 @@ body {
 @media (max-width: 768px) {
   .welcome-modal {
     width: 96%;
-    max-height: 92vh;
+    max-height: 92dvh;
     border-radius: 16px;
   }
 
