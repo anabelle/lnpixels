@@ -1845,6 +1845,11 @@ body {
     margin-right: 0.25rem;
   }
 
+  /* Ensure purchase button is fully visible above mobile tabs */
+  .purchase-button {
+    margin-bottom: 1.5rem; /* Extra bottom margin for mobile */
+  }
+
   /* Make position display more compact on mobile */
   .position-display {
     font-size: 0.75rem;
