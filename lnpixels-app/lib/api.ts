@@ -79,6 +79,14 @@ export class ApiClient {
     });
   }
 
+  // Create bulk invoice for specific set of pixels
+  async createPixelsInvoice(pixels: Pixel[]): Promise<InvoiceResponse> {
+    return this.request<InvoiceResponse>('/invoices/pixels', {
+      method: 'POST',
+      body: JSON.stringify({ pixels }),
+    });
+  }
+
   // Get activity feed
   async getActivity(limit?: number): Promise<ActivityItem[]> {
     const query = limit ? `?limit=${limit}` : '';

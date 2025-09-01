@@ -16,11 +16,14 @@ const BASE_PRICES = {
 export function price(options: PricingOptions): number {
   // Determine base price for the new pixel type
   let basePrice: number;
-  if (options.color && options.letter) {
+  if (options.letter) {
+    // Letter pixels are always 100 sats regardless of color
     basePrice = BASE_PRICES.letter;
-  } else if (options.color) {
+  } else if (options.color && options.color !== '#000000') {
+    // Colored pixels (not black) are 10 sats
     basePrice = BASE_PRICES.color;
   } else {
+    // Basic pixels (no color or black color) are 1 sat
     basePrice = BASE_PRICES.basic;
   }
 

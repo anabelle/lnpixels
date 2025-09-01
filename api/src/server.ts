@@ -6,6 +6,38 @@ import { getDatabase } from './database';
 
 const app = express();
 
+// CORS middleware
+app.use((req, res, next) => {
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+    'http://localhost:3002',
+    'http://127.0.0.1:3002',
+    'https://lnpixels.heyanabelle.com',
+    'https://vm-522.lnvps.cloud',
+    'http://lnpixels.qzz.io',
+    'https://lnpixels.qzz.io'
+  ];
+
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-nakapay-signature');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+
+  next();
+});
+
 // Middleware to parse JSON request bodies
 app.use(express.json({
   verify: (req: any, res, buf) => {
