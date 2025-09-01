@@ -25,7 +25,11 @@ export function Toolbar({ onToggleActivity }: ToolbarProps) {
     openSaveModal,
     clearCanvas,
     pixels,
+    getNewPixels,
   } = usePixelStore()
+
+  const newPixels = getNewPixels()
+  const newPixelCount = newPixels.length
 
   const [showColorPicker, setShowColorPicker] = useState(false)
 
@@ -138,9 +142,9 @@ export function Toolbar({ onToggleActivity }: ToolbarProps) {
             <Trash2 className="h-4 w-4" />
           </Button>
 
-          <Button size="sm" className="h-8 px-3" onClick={openSaveModal} disabled={pixels.length === 0} aria-label="Save">
+          <Button size="sm" className="h-8 px-3" onClick={openSaveModal} disabled={newPixelCount === 0} aria-label="Save">
             <Save className="h-4 w-4 mr-1" />
-            <span className="text-xs">{pixels.length}</span>
+            <span className="text-xs">{newPixelCount}</span>
           </Button>
         </div>
       </div>
@@ -249,11 +253,11 @@ export function Toolbar({ onToggleActivity }: ToolbarProps) {
             <Trash2 className="h-3 w-3" />
           </Button>
 
-          <Button size="sm" className="h-6 w-6 p-0 relative" onClick={openSaveModal} disabled={pixels.length === 0} aria-label="Save">
+          <Button size="sm" className="h-6 w-6 p-0 relative" onClick={openSaveModal} disabled={newPixelCount === 0} aria-label="Save">
             <Save className="h-3 w-3" />
-            {pixels.length > 0 && (
+            {newPixelCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full w-4 h-4 flex items-center justify-center text-[10px]">
-                {pixels.length > 99 ? "99+" : pixels.length}
+                {newPixelCount > 99 ? "99+" : newPixelCount}
               </span>
             )}
           </Button>

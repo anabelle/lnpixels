@@ -5,7 +5,7 @@ import { io, Socket } from "socket.io-client"
 import { usePixelStore } from "./use-pixel-store"
 
 export function useWebSocket() {
-  const { addPixel, updatePixels } = usePixelStore()
+  const { addPixel, updatePixels, addExistingPixel } = usePixelStore()
   const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
@@ -27,8 +27,8 @@ export function useWebSocket() {
     // Listen for pixel updates
     socket.on("pixel.update", (data) => {
       console.log("Received pixel update:", data)
-      // Update the pixel in the store
-      addPixel({
+      // Update the pixel in the store as existing (from other users' payments)
+      addExistingPixel({
         x: data.x,
         y: data.y,
         color: data.color,
@@ -56,7 +56,7 @@ export function useWebSocket() {
         socketRef.current.disconnect()
       }
     }
-  }, [addPixel, updatePixels])
+  }, [addPixel, updatePixels, addExistingPixel])
 
   return socketRef.current
 }
