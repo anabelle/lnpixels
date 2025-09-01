@@ -151,7 +151,12 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
 
   updatePixels: (newPixels) => set({ pixels: newPixels }),
 
-  clearCanvas: () => set({ pixels: [] }),
+  clearCanvas: () => {
+    // Only clear new pixels (user-drawn), keep existing pixels from database
+    set((state) => ({
+      pixels: state.pixels.filter(pixel => pixel.isNew !== true)
+    }))
+  },
 
   getNewPixels: () => {
     const { pixels } = get()
