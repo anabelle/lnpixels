@@ -84,13 +84,21 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
     set((state) => {
       // Find existing pixel at the same coordinates to preserve its sats value for overwrite pricing
       const existingPixel = state.pixels.find((p) => p.x === pixel.x && p.y === pixel.y)
+      let originalPixel: Pixel | undefined
+
+      if (existingPixel && !existingPixel.isNew) {
+        // Create a clean copy of the original pixel without originalPixel field to avoid circular refs
+        const { originalPixel: _, ...cleanOriginal } = existingPixel
+        originalPixel = { ...cleanOriginal, isNew: false }
+      }
+
       const newPixel = {
         ...pixel,
         isNew: true,
         // Preserve sats value from existing pixel for overwrite pricing
         sats: existingPixel?.sats || pixel.sats,
         // Store original pixel for restoration on clear
-        originalPixel: existingPixel && !existingPixel.isNew ? existingPixel : undefined
+        originalPixel
       }
 
       if (existingPixel?.sats) {
@@ -203,16 +211,28 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
 
   clearCanvas: () => {
     // Clear new pixels (user-drawn), but restore original pixels if they were overwritten
-    set((state) => ({
-      pixels: state.pixels
-        .filter(pixel => pixel.isNew !== true) // Keep existing pixels
-        .concat(
-          // Restore original pixels for overwritten positions
-          state.pixels
-            .filter(pixel => pixel.isNew === true && pixel.originalPixel)
-            .map(pixel => pixel.originalPixel!)
-        )
-    }))
+    set((state) => {
+      const existingPixels = state.pixels.filter(pixel => pixel.isNew !== true)
+      const overwrittenPixels = state.pixels
+        .filter(pixel => pixel.isNew === true && pixel.originalPixel)
+        .map(pixel => {
+          // Create a clean copy of the original pixel without originalPixel field to avoid circular refs
+          const { originalPixel, ...cleanOriginal } = pixel.originalPixel!
+          return { ...cleanOriginal, isNew: false }
+        })
+
+      // Merge existing and restored pixels, removing duplicates by coordinate
+      const pixelMap = new Map<string, Pixel>()
+      const key = (p: Pixel) => `${p.x}:${p.y}`
+
+      // Add existing pixels first
+      existingPixels.forEach(pixel => pixelMap.set(key(pixel), pixel))
+
+      // Add restored original pixels (these will overwrite any existing ones at same position)
+      overwrittenPixels.forEach(pixel => pixelMap.set(key(pixel), pixel))
+
+      return { pixels: Array.from(pixelMap.values()) }
+    })
   },
 
   getNewPixels: () => {
