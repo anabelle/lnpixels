@@ -71,7 +71,7 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
     if (!paymentId || (!quoteId && !pixelUpdates.length)) return
 
     try {
-      const response = await fetch('http://localhost:3000/api/test-payment', {
+      const response = await fetch('https://lnpixels.qzz.io/api/test-payment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -185,7 +185,7 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
       };
       console.log('Request body:', JSON.stringify(requestBody, null, 2));
       
-      const response = await fetch('http://localhost:3000/api/invoices/pixels', {
+      const response = await fetch('https://lnpixels.qzz.io/api/invoices/pixels', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

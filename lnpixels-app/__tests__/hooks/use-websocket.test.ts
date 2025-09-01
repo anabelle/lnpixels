@@ -59,7 +59,7 @@ describe('useWebSocket', () => {
   it('should connect to websocket server', () => {
     renderHook(() => useWebSocket())
 
-  expect(io).toHaveBeenCalledWith('http://localhost:3000/api', {
+  expect(io).toHaveBeenCalledWith('https://lnpixels.qzz.io/api', {
       transports: ['websocket', 'polling'],
     })
   })

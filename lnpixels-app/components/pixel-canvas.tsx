@@ -28,7 +28,7 @@ export function PixelCanvas() {
   const paintIntentTimer = useRef<number | null>(null)
   const paintIntentCoords = useRef<{ x: number; y: number } | null>(null)
 
-  const { pixels, selectedColor, brushSize, zoom, panX, panY, toolMode, addPixel } = usePixelStore()
+  const { pixels, selectedColor, brushSize, zoom, panX, panY, toolMode, addPixel, setPan } = usePixelStore()
 
   const {
     handleMouseDown,
@@ -217,6 +217,23 @@ export function PixelCanvas() {
     window.addEventListener("resize", resizeCanvas)
     return () => window.removeEventListener("resize", resizeCanvas)
   }, [render])
+
+  // Center (0,0) coordinate on initial load
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const container = containerRef.current
+    if (!canvas || !container) return
+
+    const centerCanvas = () => {
+      const centerX = container.clientWidth / 2
+      const centerY = container.clientHeight / 2
+      setPan(centerX, centerY)
+    }
+
+    // Center after a short delay to ensure container is properly sized
+    const timeoutId = setTimeout(centerCanvas, 100)
+    return () => clearTimeout(timeoutId)
+  }, [setPan])
 
   useEffect(() => {
     render()
