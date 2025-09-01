@@ -238,6 +238,67 @@ export function PixelCanvas() {
     handleMouseUp()
   }
 
+  // --- Touch handlers: single-finger paints, two-finger pinch to pan/zoom ---
+  const handleCanvasTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      // Two-finger gesture for pan/zoom
+      handleTouchStart(e)
+      return
+    }
+
+    if (e.touches.length === 1) {
+      const t = e.touches[0]
+      const coords = getPixelCoordinates(t.clientX, t.clientY)
+      if (!coords) return
+
+      if (toolMode === "text") {
+        setTextInputPosition(coords)
+      } else if (toolMode === "paint") {
+        setIsDrawing(true)
+        // Paint initial point
+        const halfBrush = Math.floor(brushSize / 2)
+        for (let dx = -halfBrush; dx < brushSize - halfBrush; dx++) {
+          for (let dy = -halfBrush; dy < brushSize - halfBrush; dy++) {
+            addPixel({ x: coords.x + dx, y: coords.y + dy, color: selectedColor, letter: undefined })
+          }
+        }
+      }
+    }
+  }
+
+  const handleCanvasTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      // Pan/zoom with two fingers
+      handleTouchMove(e)
+      return
+    }
+
+    if (e.touches.length === 1 && toolMode === "paint" && isDrawing) {
+      e.preventDefault()
+      const t = e.touches[0]
+      const coords = getPixelCoordinates(t.clientX, t.clientY)
+      if (!coords) return
+
+      const halfBrush = Math.floor(brushSize / 2)
+      for (let dx = -halfBrush; dx < brushSize - halfBrush; dx++) {
+        for (let dy = -halfBrush; dy < brushSize - halfBrush; dy++) {
+          addPixel({ x: coords.x + dx, y: coords.y + dy, color: selectedColor, letter: undefined })
+        }
+      }
+    }
+  }
+
+  const handleCanvasTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) {
+      // End pinch state if any
+      handleTouchEnd()
+    }
+    // Stop drawing when touch ends or fingers lifted
+    if (e.touches.length === 0) {
+      setIsDrawing(false)
+    }
+  }
+
   return (
     <div
       ref={containerRef}
@@ -248,9 +309,9 @@ export function PixelCanvas() {
       onMouseMove={handleCanvasMouseMove}
       onMouseUp={handleCanvasMouseUp}
       onWheel={handleWheel}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+  onTouchStart={handleCanvasTouchStart}
+  onTouchMove={handleCanvasTouchMove}
+  onTouchEnd={handleCanvasTouchEnd}
       tabIndex={toolMode === "text" ? 0 : -1}
     >
       <canvas ref={canvasRef} className="block" style={{ touchAction: "none" }} />
