@@ -20,6 +20,7 @@ interface Pixel extends ApiPixel {
   lastSoldAmount?: number // Amount in sats the pixel was last sold for
   sats?: number // From API response
   isNew?: boolean // True if this pixel was drawn by the current user, false if loaded from database
+  originalPixel?: Pixel // Original pixel state when this pixel overwrites an existing one
 }
 
 interface PixelStore {
@@ -83,17 +84,19 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
     set((state) => {
       // Find existing pixel at the same coordinates to preserve its sats value for overwrite pricing
       const existingPixel = state.pixels.find((p) => p.x === pixel.x && p.y === pixel.y)
-      const newPixel = { 
-        ...pixel, 
+      const newPixel = {
+        ...pixel,
         isNew: true,
         // Preserve sats value from existing pixel for overwrite pricing
-        sats: existingPixel?.sats || pixel.sats
+        sats: existingPixel?.sats || pixel.sats,
+        // Store original pixel for restoration on clear
+        originalPixel: existingPixel && !existingPixel.isNew ? existingPixel : undefined
       }
-      
+
       if (existingPixel?.sats) {
         console.log(`Overwriting pixel at (${pixel.x}, ${pixel.y}) - original sats: ${existingPixel.sats}, preserved for overwrite pricing`);
       }
-      
+
       return {
         pixels: [...state.pixels.filter((p) => !(p.x === pixel.x && p.y === pixel.y)), newPixel],
       }
@@ -199,9 +202,16 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
   updatePixels: (newPixels) => set({ pixels: newPixels }),
 
   clearCanvas: () => {
-    // Only clear new pixels (user-drawn), keep existing pixels from database
+    // Clear new pixels (user-drawn), but restore original pixels if they were overwritten
     set((state) => ({
-      pixels: state.pixels.filter(pixel => pixel.isNew !== true)
+      pixels: state.pixels
+        .filter(pixel => pixel.isNew !== true) // Keep existing pixels
+        .concat(
+          // Restore original pixels for overwritten positions
+          state.pixels
+            .filter(pixel => pixel.isNew === true && pixel.originalPixel)
+            .map(pixel => pixel.originalPixel!)
+        )
     }))
   },
 
