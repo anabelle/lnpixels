@@ -25,6 +25,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
       'GET /api/pixels': 'Get pixels within a rectangle',
       'POST /api/invoices': 'Create invoice for pixel purchase',
       'POST /api/invoices/bulk': 'Create bulk invoice for rectangle purchase',
+      'POST /api/invoices/pixels': 'Create bulk invoice for specific set of pixels',
       'POST /api/nakapay': 'NakaPay webhook',
       'GET /api/activity': 'Get activity feed',
       'GET /api/verify/:eventId': 'Verify event'
@@ -39,6 +40,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
       'GET /api/pixels': 'Get pixels within a rectangle',
       'POST /api/invoices': 'Create invoice for pixel purchase',
       'POST /api/invoices/bulk': 'Create bulk invoice for rectangle purchase',
+      'POST /api/invoices/pixels': 'Create bulk invoice for specific set of pixels',
       'POST /api/nakapay': 'NakaPay webhook',
       'GET /api/activity': 'Get activity feed',
       'GET /api/verify/:eventId': 'Verify event'
@@ -186,6 +188,74 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
     } catch (error) {
       console.error('Error creating bulk invoice:', error);
       res.status(500).json({ error: 'Failed to create bulk invoice' });
+    }
+  });
+
+  // POST /invoices/pixels - Create bulk invoice for specific set of pixels
+  router.post('/invoices/pixels', async (req, res) => {
+    try {
+      const { pixels } = req.body;
+
+      // Validate pixels array
+      if (!Array.isArray(pixels) || pixels.length === 0) {
+        return res.status(400).json({ error: 'Invalid pixels array - must be non-empty array' });
+      }
+
+      // Validate max pixel count (1000 pixels per design.md)
+      if (pixels.length > 1000) {
+        return res.status(413).json({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'Pixel count exceeds maximum of 1000 pixels' } });
+      }
+
+      // Validate each pixel
+      for (const pixel of pixels) {
+        if (typeof pixel.x !== 'number' || typeof pixel.y !== 'number') {
+          return res.status(400).json({ error: 'Invalid pixel coordinates - x and y must be numbers' });
+        }
+        if (typeof pixel.color !== 'string') {
+          return res.status(400).json({ error: 'Invalid pixel color - must be string' });
+        }
+        if (pixel.letter && typeof pixel.letter !== 'string') {
+          return res.status(400).json({ error: 'Invalid pixel letter - must be string if provided' });
+        }
+      }
+
+      // Calculate total price and prepare pixel updates
+      let totalPrice = 0;
+      const pixelUpdates: any[] = [];
+
+      for (const pixel of pixels) {
+        const existingPixel = database.getPixel(pixel.x, pixel.y);
+        const lastPrice = existingPixel ? existingPixel.sats : null;
+        const pixelPrice = price({ color: pixel.color, letter: pixel.letter, lastPrice });
+        totalPrice += pixelPrice;
+
+        pixelUpdates.push({ 
+          x: pixel.x, 
+          y: pixel.y, 
+          color: pixel.color, 
+          letter: pixel.letter || null, 
+          price: pixelPrice 
+        });
+      }
+
+      // Create bulk invoice
+      const invoice = await paymentsAdapter.createInvoice(
+        totalPrice,
+        `Custom pixel purchase: ${pixels.length} pixels`,
+        { pixelUpdates, type: 'pixel_set' }
+      );
+
+      res.json({
+        invoice: invoice.invoice,
+        payment_hash: invoice.payment_hash,
+        amount: totalPrice,
+        id: invoice.id,
+        pixelCount: pixels.length,
+        isMock: !process.env.NAKAPAY_API_KEY
+      });
+    } catch (error) {
+      console.error('Error creating pixels invoice:', error);
+      res.status(500).json({ error: 'Failed to create pixels invoice' });
     }
   });
 
@@ -397,6 +467,78 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         console.log('✅ Test activity event emitted');
         res.json({ success: true, activity: testActivity });
       });
+
+     // Test endpoint for simulating payment completion
+     router.post('/test-payment', (req, res) => {
+       console.log('🧪 Test payment endpoint called');
+       const { paymentId, pixelUpdates } = req.body;
+
+       if (!paymentId) {
+         return res.status(400).json({ error: 'paymentId is required' });
+       }
+
+       // Check for idempotency
+       if (processedPayments.has(paymentId)) {
+         console.log(`Payment ${paymentId} already processed, skipping`);
+         return res.json({ success: true, message: 'Already processed' });
+       }
+
+       try {
+         if (pixelUpdates && Array.isArray(pixelUpdates)) {
+           // Bulk payment simulation
+           const pixelData = pixelUpdates.map((update: any) => ({
+             x: update.x,
+             y: update.y,
+             color: update.color || '#000000',
+             letter: update.letter,
+             sats: update.price
+           }));
+
+           const savedPixels = database.upsertPixels(pixelData);
+
+           // Insert activity records for bulk purchase
+           const timestamp = Date.now();
+           const activityRecords = pixelUpdates.map((update: any) =>
+             database.insertActivity({
+               x: update.x,
+               y: update.y,
+               color: update.color || '#000000',
+               letter: update.letter,
+               sats: update.price,
+               payment_hash: paymentId,
+               created_at: timestamp,
+               type: 'bulk_purchase'
+             })
+           );
+
+           console.log('Created bulk activity records:', activityRecords);
+
+           // Emit real-time updates for each pixel
+           savedPixels.forEach(pixel => {
+             console.log('Emitting pixel.update for test payment:', pixel);
+             io.emit('pixel.update', pixel);
+           });
+
+           // Emit payment confirmation event
+           io.emit('payment.confirmed', {
+             paymentId: paymentId,
+             amount: pixelUpdates.reduce((sum: number, update: any) => sum + update.price, 0),
+             timestamp: Date.now(),
+             metadata: { pixelUpdates, type: 'pixel_set' }
+           });
+
+           // Mark payment as processed
+           processedPayments.add(paymentId);
+
+           res.json({ success: true, pixelsUpdated: savedPixels.length, paymentId });
+         } else {
+           res.status(400).json({ error: 'pixelUpdates array is required for test payment' });
+         }
+       } catch (error) {
+         console.error('Error processing test payment:', error);
+         res.status(500).json({ error: 'Failed to process test payment' });
+       }
+     });
    }
 
    return router;

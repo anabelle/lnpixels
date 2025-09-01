@@ -2,14 +2,17 @@
   "name": "lnpixels",
   "version": "1.0.0",
   "description": "LNPixels project",
-  "workspaces": [
-    "api",
-    "web"
-  ],
   "scripts": {
-    "test": "npm run test -w api && npm run test -w web"
+    "dev:api": "pnpm --filter api dev",
+    "dev:web": "pnpm --filter web dev",
+    "dev:app": "pnpm --filter my-v0-project dev",
+    "dev:all": "pnpm --parallel --filter \"api\" --filter \"my-v0-project\" dev",
+    "build": "pnpm --filter api build && pnpm --filter web build && pnpm --filter my-v0-project build",
+    "test": "pnpm --filter api test && pnpm --filter web test && pnpm --filter my-v0-project test",
+    "install-all": "pnpm install"
   },
   "devDependencies": {
     "happy-dom": "^18.0.1"
-  }
+  },
+  "packageManager": "pnpm@9.0.0"
 }

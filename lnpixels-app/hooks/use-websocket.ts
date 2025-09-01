@@ -10,7 +10,7 @@ export function useWebSocket() {
 
   useEffect(() => {
     // Connect to the WebSocket server
-    const socket = io("http://localhost:3001/api", {
+    const socket = io("http://localhost:3000/api", {
       transports: ["websocket", "polling"],
     })
 
@@ -25,7 +25,7 @@ export function useWebSocket() {
     })
 
     // Listen for pixel updates
-    socket.on("pixel_update", (data) => {
+    socket.on("pixel.update", (data) => {
       console.log("Received pixel update:", data)
       // Update the pixel in the store
       addPixel({
@@ -37,11 +37,18 @@ export function useWebSocket() {
       })
     })
 
-    // Listen for bulk pixel updates
-    socket.on("bulk_pixel_update", (data) => {
-      console.log("Received bulk pixel update:", data)
-      // Update multiple pixels in the store
-      updatePixels(data.pixels)
+    // Listen for activity updates
+    socket.on("activity.append", (data) => {
+      console.log("Received activity update:", data)
+      // For now, we'll just log activity updates
+      // You could add activity state management here if needed
+    })
+
+    // Listen for payment confirmations
+    socket.on("payment.confirmed", (data) => {
+      console.log("Received payment confirmation:", data)
+      // Emit a window event so the save modal can listen for it
+      window.dispatchEvent(new CustomEvent('payment.confirmed', { detail: data }))
     })
 
     return () => {

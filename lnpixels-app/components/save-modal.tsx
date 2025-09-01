@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { QrCode, Copy, Check, Zap } from "lucide-react"
+import { QrCode, Copy, Check, Zap, CheckCircle } from "lucide-react"
 import { usePixelStore } from "@/hooks/use-pixel-store"
 
 interface SaveModalProps {
@@ -22,7 +22,71 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
   const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { pixels } = usePixelStore()
+  const [paymentId, setPaymentId] = useState<string>("")
+  const [pixelUpdates, setPixelUpdates] = useState<any[]>([])
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false)
+  const { pixels, clearCanvas } = usePixelStore()
+
+  // Check if we're in development mode
+  const isDev = process.env.NODE_ENV === 'development'
+
+  // Listen for payment confirmations
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handlePaymentConfirmed = (event: CustomEvent) => {
+      console.log('Payment confirmed:', event.detail)
+      if (event.detail.paymentId === paymentId) {
+        setPaymentConfirmed(true)
+        // Auto-close modal after 2 seconds (keep pixels on canvas)
+        setTimeout(() => {
+          // Don't clear the canvas - pixels should remain visible after purchase
+          onClose()
+          // Reset modal states only
+          setInvoice("")
+          setPaymentId("")
+          setPixelUpdates([])
+          setPaymentConfirmed(false)
+          setError(null)
+        }, 2000)
+      }
+    }
+
+    // Listen for payment confirmations via window events (from WebSocket hook)
+    window.addEventListener('payment.confirmed', handlePaymentConfirmed as EventListener)
+
+    return () => {
+      window.removeEventListener('payment.confirmed', handlePaymentConfirmed as EventListener)
+    }
+  }, [isOpen, paymentId, clearCanvas, onClose])
+
+  // Helper function to simulate payment (dev only)
+  const simulatePayment = async () => {
+    if (!paymentId || !pixelUpdates.length) return
+
+    try {
+      const response = await fetch('http://localhost:3000/api/test-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          paymentId,
+          pixelUpdates
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to simulate payment')
+      }
+
+      const result = await response.json()
+      console.log('Payment simulation result:', result)
+    } catch (error) {
+      console.error('Failed to simulate payment:', error)
+      setError('Failed to simulate payment')
+    }
+  }
 
   const pricingBreakdown = pixels.map((pixel) => {
     // Calculate base pixel type price
@@ -99,55 +163,99 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
     setLoading(true)
     setError(null)
     try {
-      // For now, we'll create individual invoices for each pixel
-      // In the future, we could optimize this with bulk invoice creation
-      const invoicePromises = pixels.map(async (pixel) => {
-        try {
-          const response = await fetch('http://localhost:3001/api/invoices', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              x: pixel.x,
-              y: pixel.y,
-              color: pixel.color,
-              letter: pixel.letter,
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error(`Failed to create invoice for pixel (${pixel.x}, ${pixel.y})`);
-          }
-
-          return await response.json();
-        } catch (error) {
-          console.error(`Error creating invoice for pixel (${pixel.x}, ${pixel.y}):`, error);
-          throw error;
-        }
+      console.log('Generating invoice for pixels:', pixels.length);
+      
+      // Use the new bulk pixels endpoint
+      const requestBody = {
+        pixels: pixels.map(pixel => ({
+          x: pixel.x,
+          y: pixel.y,
+          color: pixel.color,
+          letter: pixel.letter,
+        }))
+      };
+      console.log('Request body:', JSON.stringify(requestBody, null, 2));
+      
+      const response = await fetch('http://localhost:3000/api/invoices/pixels', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
       });
 
-      const invoiceResults = await Promise.allSettled(invoicePromises);
+      console.log('Response status:', response.status, response.statusText);
 
-      // Check if all invoices were created successfully
-      const failedInvoices = invoiceResults.filter(result => result.status === 'rejected');
-      if (failedInvoices.length > 0) {
-        throw new Error(`Failed to create ${failedInvoices.length} invoice(s)`);
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          console.error('Server error response:', errorData);
+          errorMessage = errorData?.error || errorMessage;
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+        }
+        console.error('Invoice generation failed:', errorMessage);
+        throw new Error(errorMessage);
       }
 
-      // For simplicity, use the first invoice's data
-      // In a real implementation, you might want to handle multiple invoices
-      const firstInvoice = (invoiceResults[0] as PromiseFulfilledResult<any>).value;
+      const invoiceData = await response.json();
+      console.log('Invoice generated successfully:', invoiceData);
 
-      setInvoice(firstInvoice.invoice);
+      setInvoice(invoiceData.invoice);
+      setPaymentId(invoiceData.id);
+      
+      // Store pixel updates for payment simulation
+      const updates = pixels.map(pixel => ({
+        x: pixel.x,
+        y: pixel.y,
+        color: pixel.color,
+        letter: pixel.letter || null,
+        price: summary.totalCost / pixels.length // Simple division for demo
+      }));
+      setPixelUpdates(updates);
 
       // Generate a simple QR code placeholder (you might want to use a QR code library)
-      const qrCodeData = `lightning:${firstInvoice.invoice}`;
+      const qrCodeData = `lightning:${invoiceData.invoice}`;
       setQrCode(qrCodeData);
 
     } catch (error) {
       console.error("Failed to generate invoice:", error)
-      const errorMessage = error instanceof Error ? error.message : "Failed to generate invoice"
+      console.error("Error type:", typeof error)
+      console.error("Error constructor:", error?.constructor?.name)
+      
+      let errorMessage = "Failed to generate invoice"
+      
+      if (error instanceof Error) {
+        errorMessage = error.message
+        console.log("Using Error.message:", errorMessage)
+      } else if (typeof error === 'string') {
+        errorMessage = error
+        console.log("Using string error:", errorMessage)
+      } else if (error && typeof error === 'object') {
+        console.log("Error object keys:", Object.keys(error))
+        // Try to extract a meaningful message
+        if ('message' in error && typeof error.message === 'string') {
+          errorMessage = error.message
+          console.log("Using error.message:", errorMessage)
+        } else if ('error' in error && typeof error.error === 'string') {
+          errorMessage = error.error
+          console.log("Using error.error:", errorMessage)
+        } else {
+          // Try to stringify for debugging
+          try {
+            const stringified = JSON.stringify(error, null, 2)
+            console.log("Stringified error:", stringified)
+            errorMessage = stringified.length > 200 ? stringified.substring(0, 200) + "..." : stringified
+          } catch (stringifyError) {
+            console.error("Failed to stringify error:", stringifyError)
+            errorMessage = "Unknown error occurred"
+          }
+        }
+      } else {
+        console.log("Unexpected error type, using fallback")
+      }
+      
       setError(errorMessage)
       // Fallback to mock invoice if API fails
       const mockInvoice = `lnbc${totalCost}u1p...mock_invoice_for_${totalPixels}_pixels`
@@ -234,22 +342,35 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
             </div>
           </Card>
 
+          {/* Payment Success State */}
+          {paymentConfirmed && (
+            <Card className="p-4 bg-green-50 border-green-200">
+              <div className="flex items-center gap-3 text-green-800">
+                <CheckCircle className="h-6 w-6" />
+                <div>
+                  <div className="font-semibold">Payment Confirmed!</div>
+                  <div className="text-sm">Your pixels have been saved to the canvas.</div>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* Error Display */}
-          {error && (
+          {error && !paymentConfirmed && (
             <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
               <p className="text-sm text-destructive">{error}</p>
             </div>
           )}
 
           {/* Generate Invoice */}
-          {!invoice && (
+          {!invoice && !paymentConfirmed && (
             <Button onClick={generateInvoice} disabled={loading} className="w-full">
               {loading ? "Generating..." : "Generate Lightning Invoice"}
             </Button>
           )}
 
           {/* Invoice Display */}
-          {invoice && (
+          {invoice && !paymentConfirmed && (
             <Card className="p-4 space-y-4">
               <div className="text-center">
                 <div className="w-48 h-48 mx-auto bg-muted rounded-lg flex items-center justify-center">
@@ -268,16 +389,32 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
               </div>
 
               <div className="text-xs text-muted-foreground text-center">
-                Scan QR code or copy invoice to pay with your Lightning wallet
+                Pay this invoice with your Lightning wallet. Payment will be automatically confirmed.
               </div>
+
+              {/* Dev-only simulation button */}
+              {isDev && (
+                <div className="border-t pt-4">
+                  <div className="text-xs text-orange-600 mb-2 text-center">
+                    Development Mode - Simulate Payment
+                  </div>
+                  <Button 
+                    onClick={simulatePayment} 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full border-orange-200 text-orange-600 hover:bg-orange-50"
+                  >
+                    🧪 Simulate Payment (Dev Only)
+                  </Button>
+                </div>
+              )}
             </Card>
           )}
 
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} className="flex-1 bg-transparent">
-              Cancel
+              {paymentConfirmed ? "Close" : "Cancel"}
             </Button>
-            {invoice && <Button className="flex-1">I've Paid</Button>}
           </div>
         </div>
       </DialogContent>

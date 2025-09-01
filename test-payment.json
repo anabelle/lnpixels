@@ -1,0 +1,12 @@
+{
+  "paymentId": "test123",
+  "pixelUpdates": [
+    {
+      "x": 0,
+      "y": 0,
+      "color": "#ff0000",
+      "letter": "A",
+      "price": 100
+    }
+  ]
+}
