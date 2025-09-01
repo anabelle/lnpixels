@@ -25,6 +25,7 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
   const [error, setError] = useState<string | null>(null)
   const [paymentId, setPaymentId] = useState<string>("")
   const [pixelUpdates, setPixelUpdates] = useState<any[]>([])
+  const [quoteId, setQuoteId] = useState<string>("")
   const [paymentConfirmed, setPaymentConfirmed] = useState(false)
   const { pixels, clearCanvas, getNewPixels, markNewPixelsAsExisting } = usePixelStore()
 
@@ -49,6 +50,7 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
           setInvoice("")
           setPaymentId("")
           setPixelUpdates([])
+          setQuoteId("")
           setPaymentConfirmed(false)
           setError(null)
         }, 2000)
@@ -65,7 +67,8 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
 
   // Helper function to simulate payment (dev only)
   const simulatePayment = async () => {
-    if (!paymentId || !pixelUpdates.length) return
+    // In dev, allow simulation if we have a paymentId and either a quoteId or pixelUpdates
+    if (!paymentId || (!quoteId && !pixelUpdates.length)) return
 
     try {
       const response = await fetch('http://localhost:3000/api/test-payment', {
@@ -73,10 +76,11 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          paymentId,
-          pixelUpdates
-        }),
+        body: JSON.stringify(
+          quoteId
+            ? { paymentId, quoteId }
+            : { paymentId, pixelUpdates }
+        ),
       })
 
       if (!response.ok) {
@@ -209,6 +213,7 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
 
       setInvoice(invoiceData.invoice);
       setPaymentId(invoiceData.id);
+  if (invoiceData.quoteId) setQuoteId(invoiceData.quoteId);
       
       // Store pixel updates for payment simulation with individual pixel prices
       const updates = newPixels.map(pixel => {

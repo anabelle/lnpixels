@@ -15,8 +15,14 @@ const paymentsAdapter: PaymentsAdapter = process.env.NAKAPAY_API_KEY
   : new MockPaymentsAdapter();
 
 export function setupRoutes(io: Namespace, db?: PixelDatabase) {
+  // Configurable limits (raise via env)
+  const MAX_BULK_PIXELS = Number(process.env.MAX_BULK_PIXELS || 2000)
+  const MAX_RECT_PIXELS = Number(process.env.MAX_RECT_PIXELS || 2000)
+
   // Use provided database or get default instance
   const database = db || getDatabase();
+  // Temporary in-memory quote store to avoid pushing large metadata to the payment provider
+  const bulkQuotes = new Map<string, { pixelUpdates: any[]; totalPrice: number; totalPixels: number; createdAt: number }>()
   // API info endpoint (mounted at /api/)
   router.get('/', (req, res) => res.json({
     name: 'LNPixels API',
@@ -125,9 +131,9 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
        const height = Math.abs(y2 - y1) + 1;
        const totalPixels = width * height;
 
-       // Validate max rectangle size (1000 pixels per design.md)
-       if (totalPixels > 1000) {
-         return res.status(413).json({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'Rectangle size exceeds maximum of 1000 pixels' } });
+       // Validate max rectangle size (configurable)
+       if (totalPixels > MAX_RECT_PIXELS) {
+         return res.status(413).json({ error: { code: 'PAYLOAD_TOO_LARGE', message: `Rectangle size exceeds maximum of ${MAX_RECT_PIXELS} pixels` } });
        }
 
         // Validate letters length
@@ -170,11 +176,15 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
          }
        }
 
-       // Create bulk invoice
+       // Store quote server-side
+       const quoteId = `q_${Date.now()}_${Math.random().toString(36).slice(2)}`
+       bulkQuotes.set(quoteId, { pixelUpdates, totalPrice, totalPixels, createdAt: Date.now() })
+
+       // Create invoice with minimal metadata
        const invoice = await paymentsAdapter.createInvoice(
          totalPrice,
          `Bulk pixel purchase: ${totalPixels} pixels`,
-         { x1, y1, x2, y2, color: pixelColor, letters, pixelUpdates }
+         { quoteId, type: 'rect' }
        );
 
        res.json({
@@ -183,6 +193,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
          amount: totalPrice,
          id: invoice.id,
          pixelCount: totalPixels,
+         quoteId,
          isMock: !process.env.NAKAPAY_API_KEY
        });
     } catch (error) {
@@ -201,9 +212,9 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         return res.status(400).json({ error: 'Invalid pixels array - must be non-empty array' });
       }
 
-      // Validate max pixel count (1000 pixels per design.md)
-      if (pixels.length > 1000) {
-        return res.status(413).json({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'Pixel count exceeds maximum of 1000 pixels' } });
+      // Validate max pixel count (configurable)
+      if (pixels.length > MAX_BULK_PIXELS) {
+        return res.status(413).json({ error: { code: 'PAYLOAD_TOO_LARGE', message: `Pixel count exceeds maximum of ${MAX_BULK_PIXELS} pixels` } });
       }
 
       // Validate each pixel
@@ -238,11 +249,15 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         });
       }
 
-      // Create bulk invoice
+      // Store quote server-side
+      const quoteId = `q_${Date.now()}_${Math.random().toString(36).slice(2)}`
+      bulkQuotes.set(quoteId, { pixelUpdates, totalPrice, totalPixels: pixels.length, createdAt: Date.now() })
+
+      // Create invoice with minimal metadata
       const invoice = await paymentsAdapter.createInvoice(
         totalPrice,
         `Custom pixel purchase: ${pixels.length} pixels`,
-        { pixelUpdates, type: 'pixel_set' }
+        { quoteId, type: 'pixel_set' }
       );
 
       res.json({
@@ -250,7 +265,8 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         payment_hash: invoice.payment_hash,
         amount: totalPrice,
         id: invoice.id,
-        pixelCount: pixels.length,
+  pixelCount: pixels.length,
+  quoteId,
         isMock: !process.env.NAKAPAY_API_KEY
       });
     } catch (error) {
@@ -293,9 +309,14 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
         const metadata = payload.metadata;
 
-         if (metadata.pixelUpdates) {
-            // Bulk payment - use database bulk upsert
-             const pixelData = metadata.pixelUpdates.map((update: any) => ({
+         if (metadata.quoteId) {
+            // Bulk payment resolved via server-side quote
+            const quote = bulkQuotes.get(metadata.quoteId)
+            if (!quote) {
+              console.error('Quote not found or expired:', metadata.quoteId)
+              return res.status(410).json({ error: 'Quote not found or expired' })
+            }
+            const pixelData = quote.pixelUpdates.map((update: any) => ({
                x: update.x,
                y: update.y,
                color: update.color || '#000000', // Default to black for basic pixels
@@ -308,7 +329,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
                // Insert activity records for bulk purchase
                const timestamp = Date.now();
-                const activityRecords = metadata.pixelUpdates.map((update: any) =>
+                const activityRecords = quote.pixelUpdates.map((update: any) =>
                   database.insertActivity({
                     x: update.x,
                     y: update.y,
@@ -337,6 +358,42 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
                   type: 'bulk_purchase'
                 };
                 console.log('Emitting bulk activity.append event:', summaryActivity);
+                io.emit('activity.append', summaryActivity);
+              }
+
+              // Consume the quote after success
+              bulkQuotes.delete(metadata.quoteId)
+            } catch (error) {
+              console.error('Error saving bulk pixels to database:', error);
+              return res.status(500).json({ error: 'Failed to save pixels' });
+            }
+          } else if (metadata.pixelUpdates) {
+            // Backward compatibility: older flows that still send pixelUpdates in metadata
+             const pixelData = metadata.pixelUpdates.map((update: any) => ({
+               x: update.x,
+               y: update.y,
+               color: update.color || '#000000',
+               letter: update.letter,
+               sats: update.price
+             }));
+            try {
+              const savedPixels = database.upsertPixels(pixelData);
+              const timestamp = Date.now();
+              const activityRecords = metadata.pixelUpdates.map((update: any) =>
+                database.insertActivity({
+                  x: update.x,
+                  y: update.y,
+                  color: update.color || '#000000',
+                  letter: update.letter,
+                  sats: update.price,
+                  payment_hash: paymentId,
+                  created_at: timestamp,
+                  type: 'bulk_purchase'
+                })
+              );
+              savedPixels.forEach(pixel => io.emit('pixel.update', pixel));
+              if (activityRecords.length > 0) {
+                const summaryActivity = { ...activityRecords[0], summary: `${activityRecords.length} pixels purchased`, type: 'bulk_purchase' };
                 io.emit('activity.append', summaryActivity);
               }
             } catch (error) {
@@ -471,7 +528,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
      // Test endpoint for simulating payment completion
      router.post('/test-payment', (req, res) => {
        console.log('🧪 Test payment endpoint called');
-       const { paymentId, pixelUpdates } = req.body;
+       const { paymentId, pixelUpdates, quoteId } = req.body;
 
        if (!paymentId) {
          return res.status(400).json({ error: 'paymentId is required' });
@@ -484,7 +541,62 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
        }
 
        try {
-         if (pixelUpdates && Array.isArray(pixelUpdates)) {
+         if (quoteId) {
+           // Resolve server-side quote to simulate webhook behavior
+           const quote = bulkQuotes.get(quoteId)
+           if (!quote) {
+             return res.status(410).json({ error: 'Quote not found or expired' })
+           }
+
+           const pixelData = quote.pixelUpdates.map((update: any) => ({
+             x: update.x,
+             y: update.y,
+             color: update.color || '#000000',
+             letter: update.letter,
+             sats: update.price
+           }));
+
+           const savedPixels = database.upsertPixels(pixelData);
+
+           // Insert activity records for bulk purchase
+           const timestamp = Date.now();
+           const activityRecords = quote.pixelUpdates.map((update: any) =>
+             database.insertActivity({
+               x: update.x,
+               y: update.y,
+               color: update.color || '#000000',
+               letter: update.letter,
+               sats: update.price,
+               payment_hash: paymentId,
+               created_at: timestamp,
+               type: 'bulk_purchase'
+             })
+           );
+
+           console.log('Created bulk activity records (quote):', activityRecords);
+
+           // Emit real-time updates for each pixel
+           savedPixels.forEach(pixel => {
+             console.log('Emitting pixel.update for test payment (quote):', pixel);
+             io.emit('pixel.update', pixel);
+           });
+
+           // Emit payment confirmation event
+           io.emit('payment.confirmed', {
+             paymentId: paymentId,
+             amount: quote.pixelUpdates.reduce((sum: number, update: any) => sum + update.price, 0),
+             timestamp: Date.now(),
+             metadata: { quoteId, type: 'pixel_set' }
+           });
+
+           // Mark payment as processed
+           processedPayments.add(paymentId);
+
+           // Consume the quote to mimic real flow
+           bulkQuotes.delete(quoteId)
+
+           return res.json({ success: true, pixelsUpdated: savedPixels.length, paymentId, usedQuote: true });
+         } else if (pixelUpdates && Array.isArray(pixelUpdates)) {
            // Bulk payment simulation
            const pixelData = pixelUpdates.map((update: any) => ({
              x: update.x,

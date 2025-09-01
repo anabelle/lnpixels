@@ -38,8 +38,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Middleware to parse JSON request bodies
+// Middleware to parse JSON request bodies (allow larger payloads for bulk pixel sets)
 app.use(express.json({
+  limit: '5mb',
   verify: (req: any, res, buf) => {
     // Capture raw body for webhook signature verification
     if (req.url === '/api/nakapay') {
