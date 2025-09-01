@@ -3,7 +3,7 @@
 import { useRef, useCallback, useEffect, useState } from "react"
 import { usePixelStore } from "./use-pixel-store"
 
-export function usePanZoom(containerRef: React.RefObject<HTMLDivElement>) {
+export function usePanZoom(containerRef: React.RefObject<HTMLDivElement | null>) {
   const { zoom, panX, panY, setZoom, setPan } = usePixelStore()
   const isDragging = useRef(false)
   const lastMousePos = useRef({ x: 0, y: 0 })
