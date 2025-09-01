@@ -52,6 +52,9 @@ interface PixelStore {
   updatePixels: (newPixels: Pixel[]) => void
   clearCanvas: () => void
   fetchPixels: (x1: number, y1: number, x2: number, y2: number) => Promise<void>
+  // Progressive/infinite loading helpers
+  mergeExistingPixels: (newPixels: Pixel[]) => void
+  fetchMorePixels: (x1: number, y1: number, x2: number, y2: number) => Promise<void>
   setError: (error: string | null) => void
   setLoading: (loading: boolean) => void
   getNewPixels: () => Pixel[] // Get only pixels drawn by the current user
@@ -126,6 +129,35 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
         error: error instanceof Error ? error.message : 'Failed to fetch pixels',
         isLoading: false
       });
+    }
+  },
+
+  // Merge a batch of existing pixels into the canvas without clearing user-drawn ones
+  mergeExistingPixels: (newPixels) =>
+    set((state) => {
+      if (!newPixels || newPixels.length === 0) return { pixels: state.pixels }
+      // Build a map for quick replacement by coordinate
+      const key = (p: Pixel) => `${p.x}:${p.y}`
+      const current = new Map<string, Pixel>()
+      for (const p of state.pixels) current.set(key(p), p)
+      for (const p of newPixels) {
+        const existing = current.get(key(p))
+        // If there's a user-drawn new pixel at same spot, keep it (don't overwrite in-progress work)
+        if (existing?.isNew) continue
+        current.set(key(p), { ...p, isNew: false })
+      }
+      return { pixels: Array.from(current.values()) }
+    }),
+
+  // Fetch more pixels for a rectangle and merge them without resetting the canvas
+  fetchMorePixels: async (x1, y1, x2, y2) => {
+    try {
+      const pixels = await apiClient.getPixels(x1, y1, x2, y2)
+      const existingPixels = pixels.map(pixel => ({ ...pixel, isNew: false }))
+      get().mergeExistingPixels(existingPixels)
+    } catch (error) {
+      console.error('Failed to fetch more pixels:', error)
+      // don't surface as fatal error to avoid UI flashes; keep silent for progressive loads
     }
   },
 
