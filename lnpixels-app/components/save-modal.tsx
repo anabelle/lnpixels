@@ -25,7 +25,7 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
   const [paymentId, setPaymentId] = useState<string>("")
   const [pixelUpdates, setPixelUpdates] = useState<any[]>([])
   const [paymentConfirmed, setPaymentConfirmed] = useState(false)
-  const { pixels, clearCanvas } = usePixelStore()
+  const { pixels, clearCanvas, getNewPixels, markNewPixelsAsExisting } = usePixelStore()
 
   // Check if we're in development mode
   const isDev = process.env.NODE_ENV === 'development'
@@ -38,6 +38,8 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
       console.log('Payment confirmed:', event.detail)
       if (event.detail.paymentId === paymentId) {
         setPaymentConfirmed(true)
+        // Mark the new pixels as existing since they've been paid for
+        markNewPixelsAsExisting()
         // Auto-close modal after 2 seconds (keep pixels on canvas)
         setTimeout(() => {
           // Don't clear the canvas - pixels should remain visible after purchase
@@ -88,7 +90,9 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
     }
   }
 
-  const pricingBreakdown = pixels.map((pixel) => {
+  // Calculate pricing breakdown only for new pixels
+  const newPixels = getNewPixels()
+  const pricingBreakdown = newPixels.map((pixel) => {
     // Calculate base pixel type price
     let basePrice: number
     let pixelType: string
@@ -163,11 +167,11 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
     setLoading(true)
     setError(null)
     try {
-      console.log('Generating invoice for pixels:', pixels.length);
+      console.log('Generating invoice for pixels:', newPixels.length);
       
       // Use the new bulk pixels endpoint
       const requestBody = {
-        pixels: pixels.map(pixel => ({
+        pixels: newPixels.map(pixel => ({
           x: pixel.x,
           y: pixel.y,
           color: pixel.color,
@@ -206,12 +210,12 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
       setPaymentId(invoiceData.id);
       
       // Store pixel updates for payment simulation
-      const updates = pixels.map(pixel => ({
+      const updates = newPixels.map(pixel => ({
         x: pixel.x,
         y: pixel.y,
         color: pixel.color,
         letter: pixel.letter || null,
-        price: summary.totalCost / pixels.length // Simple division for demo
+        price: summary.totalCost / newPixels.length // Simple division for demo
       }));
       setPixelUpdates(updates);
 
@@ -364,9 +368,17 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
 
           {/* Generate Invoice */}
           {!invoice && !paymentConfirmed && (
-            <Button onClick={generateInvoice} disabled={loading} className="w-full">
-              {loading ? "Generating..." : "Generate Lightning Invoice"}
-            </Button>
+            <>
+              {newPixels.length === 0 ? (
+                <div className="text-center p-4 bg-muted rounded-lg">
+                  <p className="text-muted-foreground">No new pixels to save. Draw some pixels first!</p>
+                </div>
+              ) : (
+                <Button onClick={generateInvoice} disabled={loading} className="w-full">
+                  {loading ? "Generating..." : "Generate Lightning Invoice"}
+                </Button>
+              )}
+            </>
           )}
 
           {/* Invoice Display */}
