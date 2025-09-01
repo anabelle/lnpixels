@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useRef, useCallback, useEffect, useState } from "react"
 import { usePixelStore } from "./use-pixel-store"
 
@@ -11,7 +9,7 @@ export function usePanZoom(containerRef: React.RefObject<HTMLDivElement>) {
   const lastMousePos = useRef({ x: 0, y: 0 })
   const lastTouchDistance = useRef(0)
   const lastTouchCenter = useRef({ x: 0, y: 0 })
-  const [isSpacePressed, setIsSpacePressed] = useState(false)
+  const [isShiftPressed, setIsShiftPressed] = useState(false)
 
   const panRef = useRef({ x: panX, y: panY })
 
@@ -21,19 +19,21 @@ export function usePanZoom(containerRef: React.RefObject<HTMLDivElement>) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "Space" && !e.repeat) {
-        e.preventDefault()
-        setIsSpacePressed(true)
-        if (containerRef.current) {
-          containerRef.current.style.cursor = "grab"
+      if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
+        if (!e.repeat) {
+          e.preventDefault()
+          setIsShiftPressed(true)
+          if (containerRef.current) {
+            containerRef.current.style.cursor = "grab"
+          }
         }
       }
     }
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === "Space") {
+      if (e.code === "ShiftLeft" || e.code === "ShiftRight") {
         e.preventDefault()
-        setIsSpacePressed(false)
+        setIsShiftPressed(false)
         if (containerRef.current) {
           containerRef.current.style.cursor = "crosshair"
         }
@@ -69,16 +69,16 @@ export function usePanZoom(containerRef: React.RefObject<HTMLDivElement>) {
     if (isDragging.current) {
       isDragging.current = false
       if (containerRef.current) {
-        containerRef.current.style.cursor = isSpacePressed ? "grab" : "crosshair"
+        containerRef.current.style.cursor = isShiftPressed ? "grab" : "crosshair"
       }
     }
     document.removeEventListener("mousemove", handleGlobalMouseMove)
     document.removeEventListener("mouseup", handleGlobalMouseUp)
-  }, [containerRef, handleGlobalMouseMove, isSpacePressed])
+  }, [containerRef, handleGlobalMouseMove, isShiftPressed])
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if ((e.button === 0 && isSpacePressed) || e.button === 1 || e.button === 2) {
+      if ((e.button === 0 && isShiftPressed) || e.button === 1 || e.button === 2) {
         e.preventDefault()
         e.stopPropagation() // Prevent painting when panning
         isDragging.current = true
@@ -91,7 +91,7 @@ export function usePanZoom(containerRef: React.RefObject<HTMLDivElement>) {
         document.addEventListener("mouseup", handleGlobalMouseUp)
       }
     },
-    [containerRef, handleGlobalMouseMove, handleGlobalMouseUp, isSpacePressed],
+    [containerRef, handleGlobalMouseMove, handleGlobalMouseUp, isShiftPressed],
   )
 
   const handleMouseMove = useCallback(() => {
@@ -126,14 +126,14 @@ export function usePanZoom(containerRef: React.RefObject<HTMLDivElement>) {
     [zoom, panX, panY, setZoom, setPan, containerRef],
   )
 
-  const getTouchDistance = (touches: TouchList) => {
+  const getTouchDistance = (touches: React.TouchList) => {
     if (touches.length < 2) return 0
     const dx = touches[0].clientX - touches[1].clientX
     const dy = touches[0].clientY - touches[1].clientY
     return Math.sqrt(dx * dx + dy * dy)
   }
 
-  const getTouchCenter = (touches: TouchList) => {
+  const getTouchCenter = (touches: React.TouchList) => {
     if (touches.length === 1) {
       return { x: touches[0].clientX, y: touches[0].clientY }
     }
@@ -205,6 +205,7 @@ export function usePanZoom(containerRef: React.RefObject<HTMLDivElement>) {
     handleTouchStart,
     handleTouchMove,
     handleTouchEnd,
-    isSpacePressed,
+    isShiftPressed,
+    isDragging: isDragging.current,
   }
 }

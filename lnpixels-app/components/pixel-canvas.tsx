@@ -30,16 +30,26 @@ export function PixelCanvas() {
     handleTouchStart,
     handleTouchMove,
     handleTouchEnd,
-    isSpacePressed,
+    isShiftPressed,
+    isDragging,
   } = usePanZoom(containerRef)
 
   useWebSocket()
+
+  // Clear drawing state when shift is pressed (prevents drawing during panning)
+  useEffect(() => {
+    if (isShiftPressed) {
+      setIsDrawing(false)
+      // Don't clear text input position - let user resume typing after panning
+    }
+  }, [isShiftPressed])
 
   const GRID_SIZE = 10
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      if (toolMode === "text" && textInputPosition && e.key.length === 1) {
+      // Allow text input unless we're actively dragging (panning intent)
+      if (toolMode === "text" && textInputPosition && e.key.length === 1 && !isDragging) {
         addPixel({
           x: textInputPosition.x,
           y: textInputPosition.y,
@@ -57,7 +67,7 @@ export function PixelCanvas() {
       window.addEventListener("keypress", handleKeyPress)
       return () => window.removeEventListener("keypress", handleKeyPress)
     }
-  }, [toolMode, textInputPosition, selectedColor, addPixel])
+  }, [toolMode, textInputPosition, selectedColor, addPixel, isDragging])
 
   const drawGrid = useCallback(
     (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => {
@@ -174,7 +184,7 @@ export function PixelCanvas() {
   }
 
   const handleCanvasClick = (e: React.MouseEvent) => {
-    if (isSpacePressed) return
+    if (isShiftPressed) return
 
     const coords = getPixelCoordinates(e.clientX, e.clientY)
     if (!coords) return
@@ -199,9 +209,11 @@ export function PixelCanvas() {
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
     if (e.button === 0) {
-      if (isSpacePressed) {
+      if (isShiftPressed) {
+        // Panning mode - don't set drawing state
         handleMouseDown(e)
       } else {
+        // Only set drawing state in paint mode
         if (toolMode === "paint") {
           setIsDrawing(true)
         }
@@ -213,24 +225,24 @@ export function PixelCanvas() {
   }
 
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
-    if (isDrawing && !isSpacePressed && toolMode === "paint") {
+    // Only draw if we're in paint mode, currently drawing, not panning, and not in shift-pan mode
+    if (isDrawing && !isShiftPressed && toolMode === "paint") {
       handleCanvasClick(e)
     }
-    handleMouseMove(e)
+    handleMouseMove()
   }
 
   const handleCanvasMouseUp = (e: React.MouseEvent) => {
-    if (!isSpacePressed) {
-      setIsDrawing(false)
-    }
-    handleMouseUp(e)
+    // Always clear drawing state on mouse up
+    setIsDrawing(false)
+    handleMouseUp()
   }
 
   return (
     <div
       ref={containerRef}
       className={`h-full w-full select-none ${
-        toolMode === "text" ? "cursor-text" : isSpacePressed ? "cursor-move" : "cursor-pointer"
+        toolMode === "text" ? "cursor-text" : isShiftPressed ? "cursor-move" : "cursor-pointer"
       }`}
       onMouseDown={handleCanvasMouseDown}
       onMouseMove={handleCanvasMouseMove}
