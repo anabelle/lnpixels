@@ -199,7 +199,7 @@ The LNPixels API provides RESTful endpoints for canvas management, payment proce
 
 ### Base URL
 ```
-https://lnpixels.qzz.io/api
+https://ln.pixel.xx.kg/api
 ```
 
 ### Authentication
@@ -222,7 +222,7 @@ Retrieve pixel data within a specified rectangle area.
 
 **Example Request:**
 ```bash
-curl "https://lnpixels.qzz.io/api/pixels?x1=0&y1=0&x2=10&y2=10"
+curl "https://ln.pixel.xx.kg/api/pixels?x1=0&y1=0&x2=10&y2=10"
 ```
 
 **Response (200 OK):**
@@ -248,7 +248,7 @@ Retrieve API version and available endpoints.
 
 **Example Request:**
 ```bash
-curl "https://lnpixels.qzz.io/api/"
+curl "https://ln.pixel.xx.kg/api/"
 ```
 
 **Response (200 OK):**
@@ -295,7 +295,7 @@ Generate a Lightning invoice for purchasing a single pixel.
 
 **Example Request:**
 ```bash
-curl -X POST "https://lnpixels.qzz.io/api/invoices" \
+curl -X POST "https://ln.pixel.xx.kg/api/invoices" \
   -H "Content-Type: application/json" \
   -d '{"x": 100, "y": 50, "color": "#FF5733", "type": "color"}'
 ```
@@ -330,7 +330,7 @@ Generate a Lightning invoice for purchasing multiple pixels in a rectangle.
 
 **Example Request:**
 ```bash
-curl -X POST "https://lnpixels.qzz.io/api/invoices/bulk" \
+curl -X POST "https://ln.pixel.xx.kg/api/invoices/bulk" \
   -H "Content-Type: application/json" \
   -d '{"x1": 100, "y1": 50, "x2": 110, "y2": 60, "color": "#FF5733", "type": "color"}'
 ```
@@ -389,7 +389,7 @@ Retrieve recent canvas activity and purchases.
 
 **Example Request:**
 ```bash
-curl "https://lnpixels.qzz.io/api/activity?limit=10"
+curl "https://ln.pixel.xx.kg/api/activity?limit=10"
 ```
 
 **Response (200 OK):**
@@ -436,7 +436,7 @@ Verify the authenticity of a Nostr event related to canvas activity.
 
 **Example Request:**
 ```bash
-curl "https://lnpixels.qzz.io/api/verify/a1b2c3d4e5f6..."
+curl "https://ln.pixel.xx.kg/api/verify/a1b2c3d4e5f6..."
 ```
 
 **Response (200 OK):**
@@ -461,11 +461,11 @@ curl "https://lnpixels.qzz.io/api/verify/a1b2c3d4e5f6..."
 
 The API also provides real-time updates via WebSocket for live canvas synchronization.
 
-**WebSocket URL:** `wss://lnpixels.qzz.io`
+**WebSocket URL:** `wss://ln.pixel.xx.kg`
 
 **Connection Example:**
 ```javascript
-const socket = io('https://lnpixels.qzz.io');
+const socket = io('https://ln.pixel.xx.kg');
 
 // Listen for pixel updates
 socket.on('pixelUpdate', (data) => {
