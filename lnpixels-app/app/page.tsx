@@ -4,12 +4,14 @@ import { PixelCanvas } from "@/components/pixel-canvas"
 import { Toolbar } from "@/components/toolbar"
 import { ActivityFeed } from "@/components/activity-feed"
 import { SaveModal } from "@/components/save-modal"
+import { InfoModal } from "@/components/info-modal"
 import { usePixelStore } from "@/hooks/use-pixel-store"
 import { useWebSocket } from "@/hooks/use-websocket"
 import { useState, useEffect } from "react"
 
 export default function Home() {
   const [showActivityFeed, setShowActivityFeed] = useState(false)
+  const [showInfo, setShowInfo] = useState(false)
   const { saveModal, closeSaveModal, fetchPixels, isLoading, error } = usePixelStore()
 
   // Initialize WebSocket connection for real-time updates
@@ -20,6 +22,17 @@ export default function Home() {
     // Fetch a reasonable viewport of pixels (e.g., -50 to 50 in both directions)
     fetchPixels(-50, -50, 50, 50)
   }, [fetchPixels])
+
+  // Show Info modal on first visit
+  useEffect(() => {
+    try {
+      const seen = typeof window !== "undefined" && localStorage.getItem("lnpixels_seen_info")
+      if (!seen) {
+        setShowInfo(true)
+        localStorage.setItem("lnpixels_seen_info", "1")
+      }
+    } catch {}
+  }, [])
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-background">
@@ -46,7 +59,10 @@ export default function Home() {
 
         {/* Toolbar */}
         <div className="absolute top-4 left-4 z-10">
-          <Toolbar onToggleActivity={() => setShowActivityFeed(!showActivityFeed)} />
+          <Toolbar
+            onToggleActivity={() => setShowActivityFeed(!showActivityFeed)}
+            onOpenInfo={() => setShowInfo(true)}
+          />
         </div>
 
         {/* Activity Feed */}
@@ -62,6 +78,15 @@ export default function Home() {
             onClose={closeSaveModal}
             totalPixels={saveModal.totalPixels}
             totalCost={saveModal.totalCost}
+          />
+        )}
+
+        {/* Info modal */}
+        {showInfo && (
+          <InfoModal
+            isOpen={showInfo}
+            onClose={() => setShowInfo(false)}
+            onGetStarted={() => setShowInfo(false)}
           />
         )}
       </div>
