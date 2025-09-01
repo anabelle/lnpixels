@@ -24,7 +24,7 @@ interface UseActivityResult {
 }
 
 // Keep base URL consistent with the rest of the app (see lib/api.ts)
-const API_BASE_URL = "https://lnpixels.qzz.io/api"
+const API_BASE_URL = "https://ln.pixel.xx.kg/api"
 
 export function useActivity(): UseActivityResult {
   const [activities, setActivities] = useState<ActivityItem[]>([])

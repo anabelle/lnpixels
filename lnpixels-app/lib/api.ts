@@ -1,4 +1,4 @@
-const API_BASE_URL = 'https://lnpixels.qzz.io/api';
+const API_BASE_URL = 'https://ln.pixel.xx.kg/api';
 
 export interface Pixel {
   x: number;
