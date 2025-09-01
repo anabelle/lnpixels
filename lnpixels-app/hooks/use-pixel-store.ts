@@ -77,9 +77,24 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
 
   // Actions
   addPixel: (pixel) =>
-    set((state) => ({
-      pixels: [...state.pixels.filter((p) => !(p.x === pixel.x && p.y === pixel.y)), { ...pixel, isNew: true }],
-    })),
+    set((state) => {
+      // Find existing pixel at the same coordinates to preserve its sats value for overwrite pricing
+      const existingPixel = state.pixels.find((p) => p.x === pixel.x && p.y === pixel.y)
+      const newPixel = { 
+        ...pixel, 
+        isNew: true,
+        // Preserve sats value from existing pixel for overwrite pricing
+        sats: existingPixel?.sats || pixel.sats
+      }
+      
+      if (existingPixel?.sats) {
+        console.log(`Overwriting pixel at (${pixel.x}, ${pixel.y}) - original sats: ${existingPixel.sats}, preserved for overwrite pricing`);
+      }
+      
+      return {
+        pixels: [...state.pixels.filter((p) => !(p.x === pixel.x && p.y === pixel.y)), newPixel],
+      }
+    }),
 
   addExistingPixel: (pixel) =>
     set((state) => ({
@@ -132,7 +147,7 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
 
       // If pixel has purchase history, apply overwrite rule
       if (pixel.sats) {
-        const overwritePrice = pixel.sats * 2
+        const overwritePrice = Math.round(pixel.sats * 2)
         return cost + Math.max(basePrice, overwritePrice)
       }
 

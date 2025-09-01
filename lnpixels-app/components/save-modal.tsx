@@ -110,8 +110,8 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
     // Calculate actual cost (including overwrite rule)
     let actualCost = basePrice
     let isOverwrite = false
-    if (pixel.lastSoldAmount) {
-      const overwritePrice = pixel.lastSoldAmount * 2
+    if (pixel.sats) {
+      const overwritePrice = Math.round(pixel.sats * 2)
       if (overwritePrice > basePrice) {
         actualCost = overwritePrice
         isOverwrite = true
@@ -125,7 +125,7 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
       basePrice,
       actualCost,
       isOverwrite,
-      lastSoldAmount: pixel.lastSoldAmount,
+      lastSoldAmount: pixel.sats ? Math.round(pixel.sats) : pixel.sats,
       color: pixel.color,
       letter: pixel.letter,
     }
@@ -209,14 +209,33 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
       setInvoice(invoiceData.invoice);
       setPaymentId(invoiceData.id);
       
-      // Store pixel updates for payment simulation
-      const updates = newPixels.map(pixel => ({
-        x: pixel.x,
-        y: pixel.y,
-        color: pixel.color,
-        letter: pixel.letter || null,
-        price: summary.totalCost / newPixels.length // Simple division for demo
-      }));
+      // Store pixel updates for payment simulation with individual pixel prices
+      const updates = newPixels.map(pixel => {
+        // Calculate individual pixel price (same logic as in openSaveModal)
+        let basePrice: number
+        if (pixel.letter) {
+          basePrice = 100 // Color + letter = 100 sats
+        } else if (pixel.color === "#000000") {
+          basePrice = 1 // Black pixel = 1 sat
+        } else {
+          basePrice = 10 // Color pixel = 10 sats
+        }
+
+        // Apply overwrite rule if pixel has purchase history
+        let actualPrice = basePrice
+        if (pixel.sats) {
+          const overwritePrice = Math.round(pixel.sats * 2)
+          actualPrice = Math.max(basePrice, overwritePrice)
+        }
+
+        return {
+          x: pixel.x,
+          y: pixel.y,
+          color: pixel.color,
+          letter: pixel.letter || null,
+          price: Math.round(actualPrice) // Ensure integer satoshi values
+        }
+      });
       setPixelUpdates(updates);
 
       // Generate a simple QR code placeholder (you might want to use a QR code library)

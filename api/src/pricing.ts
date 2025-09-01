@@ -30,9 +30,9 @@ export function price(options: PricingOptions): number {
   // Overwrite rule: charge the maximum of (2x last sold price, base price for new pixel type)
   if (options.lastPrice !== null) {
     const doubleLastPrice = options.lastPrice * 2;
-    return Math.max(doubleLastPrice, basePrice);
+    return Math.round(Math.max(doubleLastPrice, basePrice));
   }
 
   // New pixel: use base price
-  return basePrice;
+  return Math.round(basePrice);
 }
