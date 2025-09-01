@@ -8,9 +8,9 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Suspense } from "react"
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
-  generator: "v0.app",
+  title: "LNPixels - Lightning Canvas",
+  description: "Create and own pixels on the Lightning Network",
+  generator: "lnpixels.app",
 }
 
 export default function RootLayout({
