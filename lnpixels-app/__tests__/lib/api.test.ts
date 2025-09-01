@@ -192,17 +192,20 @@ describe('ApiClient', () => {
 
   describe('getActivity', () => {
     it('should fetch activity without limit', async () => {
-      const mockActivity = [
-        {
-          id: '1',
-          type: 'purchase',
-          x: 1,
-          y: 1,
-          color: '#ff0000',
-          amount: 100,
-          timestamp: '2023-01-01T00:00:00Z',
-        },
-      ]
+      const mockActivity = {
+        events: [
+          {
+            id: 1,
+            type: 'single_purchase',
+            x: 1,
+            y: 1,
+            color: '#ff0000',
+            sats: 100,
+            created_at: 1700000000000,
+            payment_hash: 'hash',
+          },
+        ],
+      }
 
       mockFetch.mockResolvedValue({
         ok: true,
@@ -216,21 +219,24 @@ describe('ApiClient', () => {
           'Content-Type': 'application/json',
         },
       })
-      expect(result).toEqual(mockActivity)
+      expect(result).toEqual(mockActivity.events)
     })
 
     it('should fetch activity with limit', async () => {
-      const mockActivity = [
-        {
-          id: '1',
-          type: 'purchase',
-          x: 1,
-          y: 1,
-          color: '#ff0000',
-          amount: 100,
-          timestamp: '2023-01-01T00:00:00Z',
-        },
-      ]
+      const mockActivity = {
+        events: [
+          {
+            id: 1,
+            type: 'single_purchase',
+            x: 1,
+            y: 1,
+            color: '#ff0000',
+            sats: 100,
+            created_at: 1700000000000,
+            payment_hash: 'hash',
+          },
+        ],
+      }
 
       mockFetch.mockResolvedValue({
         ok: true,
@@ -244,7 +250,7 @@ describe('ApiClient', () => {
           'Content-Type': 'application/json',
         },
       })
-      expect(result).toEqual(mockActivity)
+      expect(result).toEqual(mockActivity.events)
     })
   })
 

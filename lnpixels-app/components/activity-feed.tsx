@@ -4,56 +4,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { X, Zap } from "lucide-react"
-import { useEffect, useState } from "react"
-
-interface Activity {
-  id: string
-  type: "purchase" | "update"
-  x: number
-  y: number
-  color: string
-  letter?: string
-  amount: number
-  timestamp: string
-}
+import { useActivity } from "@/hooks/use-activity"
 
 interface ActivityFeedProps {
   onClose: () => void
 }
 
 export function ActivityFeed({ onClose }: ActivityFeedProps) {
-  const [activities, setActivities] = useState<Activity[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { activities, loading, error, refetch } = useActivity()
 
-  useEffect(() => {
-    fetchActivities()
-  }, [])
-
-  const fetchActivities = async () => {
-    try {
-      setError(null)
-      const response = await fetch("http://localhost:3001/api/activity?limit=50")
-      if (!response.ok) {
-        throw new Error(`Failed to fetch activities: ${response.status}`)
-      }
-      const data = await response.json()
-      setActivities(data || [])
-    } catch (error) {
-      console.error("Failed to fetch activities:", error)
-      const errorMessage = error instanceof Error ? error.message : "Failed to fetch activities"
-      setError(errorMessage)
-    } finally {
-      setLoading(false)
-    }
+  const formatTimeAgo = (ts: number) => {
+    if (!ts || isNaN(ts)) return "Unknown"
+    const diff = Date.now() - ts
+    if (diff < 0) return "Just now"
+    const m = Math.floor(diff / 60000)
+    const h = Math.floor(diff / 3600000)
+    const d = Math.floor(diff / 86400000)
+    if (d > 0) return `${d}d ago`
+    if (h > 0) return `${h}h ago`
+    if (m > 0) return `${m}m ago`
+    return "Just now"
   }
 
-  const formatTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString()
-  }
-
-  const formatSats = (amount: number) => {
-    return amount.toLocaleString()
+  const formatSats = (sats: number | undefined) => {
+    if (!sats) return "0"
+    return sats.toLocaleString()
   }
 
   return (
@@ -74,10 +49,7 @@ export function ActivityFeed({ onClose }: ActivityFeedProps) {
           ) : error ? (
             <div className="text-center py-8">
               <p className="text-red-500 mb-2">{error}</p>
-              <button
-                onClick={fetchActivities}
-                className="text-sm text-primary hover:underline"
-              >
+              <button onClick={() => refetch(50)} className="text-sm text-primary hover:underline">
                 Try again
               </button>
             </div>
@@ -85,35 +57,39 @@ export function ActivityFeed({ onClose }: ActivityFeedProps) {
             <div className="text-center py-8 text-muted-foreground">No recent activity</div>
           ) : (
             <div className="space-y-3">
-              {activities.map((activity) => (
-                <div
-                  key={activity.id}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                >
+              {activities.map((a) => {
+                const key = `${a.payment_hash}-${a.x}-${a.y}-${a.created_at}`
+                return (
                   <div
-                    className="w-6 h-6 rounded border border-border flex-shrink-0"
-                    style={{ backgroundColor: activity.color }}
+                    key={key}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                   >
-                    {activity.letter && (
-                      <div className="w-full h-full flex items-center justify-center text-xs font-mono">
-                        {activity.letter}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium">
-                      Pixel ({activity.x}, {activity.y})
+                    <div
+                      className="w-6 h-6 rounded border border-border flex-shrink-0"
+                      style={{ backgroundColor: a.color }}
+                      title={a.color}
+                    >
+                      {a.letter && (
+                        <div className="w-full h-full flex items-center justify-center text-xs font-mono">
+                          {a.letter}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-xs text-muted-foreground">{formatTime(activity.timestamp)}</div>
-                  </div>
 
-                  <div className="flex items-center gap-1 text-sm font-medium text-secondary">
-                    <Zap className="h-3 w-3" />
-                    {formatSats(activity.amount)}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">
+                        {a.type === "bulk_purchase" ? "Rectangle" : "Pixel"} ({a.x}, {a.y})
+                      </div>
+                      <div className="text-xs text-muted-foreground">{formatTimeAgo(a.created_at)}</div>
+                    </div>
+
+                    <div className="flex items-center gap-1 text-sm font-medium text-secondary">
+                      <Zap className="h-3 w-3" />
+                      {formatSats(a.sats)}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </ScrollArea>
