@@ -17,18 +17,18 @@ export function ThemeToggle() {
     setIsDark(initialDark)
     document.documentElement.classList.toggle("dark", initialDark)
 
-    console.log("[v0] Theme toggle initialized - isDark:", initialDark)
+    console.log("[LNPixels] Theme toggle initialized - isDark:", initialDark)
   }, [])
 
   const handleToggle = () => {
-    console.log("[v0] Theme toggle clicked, current isDark:", isDark)
+    console.log("[LNPixels] Theme toggle clicked, current isDark:", isDark)
     const newIsDark = !isDark
 
     setIsDark(newIsDark)
     document.documentElement.classList.toggle("dark", newIsDark)
     localStorage.setItem("theme", newIsDark ? "dark" : "light")
 
-    console.log("[v0] Theme toggled to:", newIsDark ? "dark" : "light")
+    console.log("[LNPixels] Theme toggled to:", newIsDark ? "dark" : "light")
   }
 
   if (!mounted) {
@@ -39,7 +39,7 @@ export function ThemeToggle() {
     )
   }
 
-  console.log("[v0] ThemeToggle render - mounted:", mounted, "isDark:", isDark)
+  console.log("[LNPixels] ThemeToggle render - mounted:", mounted, "isDark:", isDark)
 
   return (
     <Button size="sm" variant="ghost" onClick={handleToggle} className="h-8 w-8 p-0">
