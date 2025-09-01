@@ -17,8 +17,8 @@ app.use((req, res, next) => {
     'http://127.0.0.1:3002',
     'https://lnpixels.heyanabelle.com',
     'https://vm-522.lnvps.cloud',
-    'http://lnpixels.qzz.io',
-    'https://lnpixels.qzz.io'
+    'http://ln.pixel.xx.kg',
+    'https://ln.pixel.xx.kg'
   ];
 
   const origin = req.headers.origin;
