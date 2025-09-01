@@ -18,6 +18,9 @@ export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const hiddenInputRef = useRef<HTMLInputElement>(null)
+  const lastProcessedLength = useRef(0)
+  const lastProcessedChar = useRef<{ char: string; timestamp: number } | null>(null)
+  const isComposingRef = useRef(false)
   const [isDrawing, setIsDrawing] = useState(false)
   const [textInputPosition, setTextInputPosition] = useState<{ x: number; y: number } | null>(null)
   // Touch intent: defer painting briefly to distinguish from pinch/pan
@@ -51,62 +54,68 @@ export function PixelCanvas() {
   const GRID_SIZE = 10
 
   useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      // Skip if this came from our hidden input (to avoid duplicates on mobile)
-      if (e.target === hiddenInputRef.current) return
-      
-      // Allow text input unless we're actively dragging (panning intent)
-      if (toolMode === "text" && textInputPosition && e.key.length === 1 && !isDragging) {
-        addPixel({
-          x: textInputPosition.x,
-          y: textInputPosition.y,
-          color: selectedColor,
-          letter: e.key.toUpperCase(),
-        })
-        setTextInputPosition({
-          x: textInputPosition.x + 1,
-          y: textInputPosition.y,
-        })
-      }
-    }
-
     const handleInput = (e: Event) => {
       const target = e.target as HTMLInputElement
-      const inputValue = target.value
-      
-      if (toolMode === "text" && textInputPosition && inputValue.length > 0 && !isDragging) {
-        // Get the last character typed
-        const lastChar = inputValue[inputValue.length - 1]
-        if (lastChar && lastChar.length === 1) {
-          addPixel({
-            x: textInputPosition.x,
-            y: textInputPosition.y,
-            color: selectedColor,
-            letter: lastChar.toUpperCase(),
-          })
-          setTextInputPosition({
-            x: textInputPosition.x + 1,
-            y: textInputPosition.y,
-          })
+      const value = target.value
+
+      // Skip processing while composing (IME/predictive text)
+      const ie = e as unknown as { isComposing?: boolean; inputType?: string }
+      if (ie && ie.isComposing) return
+      if (isComposingRef.current) return
+
+      if (toolMode === "text" && textInputPosition && !isDragging) {
+        const prevLen = lastProcessedLength.current
+        const currLen = value.length
+
+        if (currLen > prevLen) {
+          // Process only newly added characters in order
+          for (let i = prevLen; i < currLen; i++) {
+            const ch = value[i]
+            if (!ch) continue
+            if (ch === ' ') {
+              // spaces: no pixel; cursor will advance via delta below
+              continue
+            } else if (ch.length === 1) {
+              const upper = ch.toUpperCase()
+              addPixel({
+                x: textInputPosition.x + (i - prevLen),
+                y: textInputPosition.y,
+                color: selectedColor,
+                letter: upper,
+              })
+            }
+          }
+          // Advance cursor by number of new characters
+          const delta = currLen - prevLen
+          if (delta > 0) {
+            setTextInputPosition((pos) => pos ? { x: pos.x + delta, y: pos.y } : pos)
+          }
+        } else if (currLen < prevLen) {
+          // Deletions: move cursor back locally, but do not erase pixels already placed
+          const delta = prevLen - currLen
+          if (delta > 0) {
+            setTextInputPosition((pos) => pos ? { x: Math.max(0, pos.x - delta), y: pos.y } : pos)
+          }
         }
-        // Clear the input to allow continuous typing
-        target.value = ""
+
+        lastProcessedLength.current = currLen
       }
     }
 
     if (toolMode === "text") {
-      window.addEventListener("keypress", handleKeyPress)
-      
-      // Add input listener for mobile keyboard support
+      // Add input & composition listeners for keyboard support
       const hiddenInput = hiddenInputRef.current
       if (hiddenInput) {
         hiddenInput.addEventListener("input", handleInput)
+        hiddenInput.addEventListener("compositionstart", () => { isComposingRef.current = true })
+        hiddenInput.addEventListener("compositionend", () => { isComposingRef.current = false })
       }
-      
+
       return () => {
-        window.removeEventListener("keypress", handleKeyPress)
         if (hiddenInput) {
           hiddenInput.removeEventListener("input", handleInput)
+          hiddenInput.removeEventListener("compositionstart", () => { isComposingRef.current = true })
+          hiddenInput.removeEventListener("compositionend", () => { isComposingRef.current = false })
         }
       }
     }
@@ -245,6 +254,9 @@ export function PixelCanvas() {
 
     if (toolMode === "text") {
       setTextInputPosition(coords)
+      // Reset input tracking when setting new position
+      lastProcessedLength.current = 0
+  if (hiddenInputRef.current) hiddenInputRef.current.value = ""
       // Focus hidden input for mobile keyboard
       setTimeout(() => {
         if (hiddenInputRef.current) {
@@ -327,6 +339,9 @@ export function PixelCanvas() {
         if (!paintIntentCoords.current) return
         if (toolMode === "text") {
           setTextInputPosition(paintIntentCoords.current)
+          // Reset input tracking when setting new position
+          lastProcessedLength.current = 0
+          if (hiddenInputRef.current) hiddenInputRef.current.value = ""
           // Focus hidden input for mobile keyboard
           setTimeout(() => {
             if (hiddenInputRef.current) {
