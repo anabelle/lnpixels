@@ -12,16 +12,14 @@ import { useState, useEffect } from "react"
 export default function Home() {
   const [showActivityFeed, setShowActivityFeed] = useState(false)
   const [showInfo, setShowInfo] = useState(false)
-  const { saveModal, closeSaveModal, fetchPixels, isLoading, error } = usePixelStore()
+  // Pixel loading is handled progressively by PixelCanvas via useViewportPixels
+  // Keep only modal and error/loader via store in the future if needed
+  const { saveModal, closeSaveModal, isLoading, error } = usePixelStore()
 
   // Initialize WebSocket connection for real-time updates
   useWebSocket()
 
-  // Fetch initial pixels on component mount
-  useEffect(() => {
-    // Fetch a reasonable viewport of pixels (e.g., -50 to 50 in both directions)
-    fetchPixels(-50, -50, 50, 50)
-  }, [fetchPixels])
+  // Initial pixels are loaded based on viewport in PixelCanvas
 
   // Show Info modal on first visit
   useEffect(() => {

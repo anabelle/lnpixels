@@ -6,6 +6,7 @@ import { useRef, useEffect, useCallback, useState } from "react"
 import { usePixelStore } from "@/hooks/use-pixel-store"
 import { usePanZoom } from "@/hooks/use-pan-zoom"
 import { useWebSocket } from "@/hooks/use-websocket"
+import { useViewportPixels } from "@/hooks/use-viewport-pixels"
 
 interface Pixel {
   x: number
@@ -42,6 +43,7 @@ export function PixelCanvas() {
   } = usePanZoom(containerRef)
 
   useWebSocket()
+  useViewportPixels(containerRef)
 
   // Clear drawing state when shift is pressed (prevents drawing during panning)
   useEffect(() => {
