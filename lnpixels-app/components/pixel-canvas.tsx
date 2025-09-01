@@ -17,6 +17,7 @@ interface Pixel {
 export function PixelCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const hiddenInputRef = useRef<HTMLInputElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [textInputPosition, setTextInputPosition] = useState<{ x: number; y: number } | null>(null)
   // Touch intent: defer painting briefly to distinguish from pinch/pan
@@ -51,6 +52,9 @@ export function PixelCanvas() {
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
+      // Skip if this came from our hidden input (to avoid duplicates on mobile)
+      if (e.target === hiddenInputRef.current) return
+      
       // Allow text input unless we're actively dragging (panning intent)
       if (toolMode === "text" && textInputPosition && e.key.length === 1 && !isDragging) {
         addPixel({
@@ -66,9 +70,45 @@ export function PixelCanvas() {
       }
     }
 
+    const handleInput = (e: Event) => {
+      const target = e.target as HTMLInputElement
+      const inputValue = target.value
+      
+      if (toolMode === "text" && textInputPosition && inputValue.length > 0 && !isDragging) {
+        // Get the last character typed
+        const lastChar = inputValue[inputValue.length - 1]
+        if (lastChar && lastChar.length === 1) {
+          addPixel({
+            x: textInputPosition.x,
+            y: textInputPosition.y,
+            color: selectedColor,
+            letter: lastChar.toUpperCase(),
+          })
+          setTextInputPosition({
+            x: textInputPosition.x + 1,
+            y: textInputPosition.y,
+          })
+        }
+        // Clear the input to allow continuous typing
+        target.value = ""
+      }
+    }
+
     if (toolMode === "text") {
       window.addEventListener("keypress", handleKeyPress)
-      return () => window.removeEventListener("keypress", handleKeyPress)
+      
+      // Add input listener for mobile keyboard support
+      const hiddenInput = hiddenInputRef.current
+      if (hiddenInput) {
+        hiddenInput.addEventListener("input", handleInput)
+      }
+      
+      return () => {
+        window.removeEventListener("keypress", handleKeyPress)
+        if (hiddenInput) {
+          hiddenInput.removeEventListener("input", handleInput)
+        }
+      }
     }
   }, [toolMode, textInputPosition, selectedColor, addPixel, isDragging])
 
@@ -205,6 +245,12 @@ export function PixelCanvas() {
 
     if (toolMode === "text") {
       setTextInputPosition(coords)
+      // Focus hidden input for mobile keyboard
+      setTimeout(() => {
+        if (hiddenInputRef.current) {
+          hiddenInputRef.current.focus()
+        }
+      }, 100)
     } else {
       const halfBrush = Math.floor(brushSize / 2)
 
@@ -281,6 +327,12 @@ export function PixelCanvas() {
         if (!paintIntentCoords.current) return
         if (toolMode === "text") {
           setTextInputPosition(paintIntentCoords.current)
+          // Focus hidden input for mobile keyboard
+          setTimeout(() => {
+            if (hiddenInputRef.current) {
+              hiddenInputRef.current.focus()
+            }
+          }, 100)
         } else if (toolMode === "paint") {
           setIsDrawing(true)
           const halfBrush = Math.floor(brushSize / 2)
@@ -367,6 +419,24 @@ export function PixelCanvas() {
     >
       <canvas ref={canvasRef} className="block" style={{ touchAction: "none" }} />
 
+      {/* Hidden input for mobile keyboard support in text mode */}
+      <input
+        ref={hiddenInputRef}
+        type="text"
+        className="absolute opacity-0 pointer-events-none -z-10"
+        style={{
+          position: 'absolute',
+          top: '-9999px',
+          left: '-9999px',
+          width: '1px',
+          height: '1px',
+        }}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+      />
+
       <div className="absolute bottom-4 left-4 bg-card/90 backdrop-blur-sm px-3 py-2 rounded-lg text-sm font-mono">
         <div>Zoom: {(zoom * 100).toFixed(0)}%</div>
         <div>
@@ -387,6 +457,11 @@ export function PixelCanvas() {
           <div>Click to place cursor</div>
           <div>Type to add letters</div>
           <div className="text-xs text-muted-foreground mt-1">100 sats per letter</div>
+          {textInputPosition && (
+            <div className="text-xs text-green-600 mt-1">
+              📱 Keyboard should open automatically
+            </div>
+          )}
         </div>
       )}
     </div>
