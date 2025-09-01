@@ -14,6 +14,8 @@ export interface InvoiceResponse {
   amount: number;
   id: string;
   isMock: boolean;
+  pixelCount?: number;
+  quoteId?: string;
 }
 
 export interface ActivityItem {

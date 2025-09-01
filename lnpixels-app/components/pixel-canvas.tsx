@@ -19,6 +19,9 @@ export function PixelCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [textInputPosition, setTextInputPosition] = useState<{ x: number; y: number } | null>(null)
+  // Touch intent: defer painting briefly to distinguish from pinch/pan
+  const paintIntentTimer = useRef<number | null>(null)
+  const paintIntentCoords = useRef<{ x: number; y: number } | null>(null)
 
   const { pixels, selectedColor, brushSize, zoom, panX, panY, toolMode, addPixel } = usePixelStore()
 
@@ -168,6 +171,17 @@ export function PixelCanvas() {
     render()
   }, [render])
 
+  // Clear any pending touch intent timer on unmount/tool change
+  useEffect(() => {
+    return () => {
+      if (paintIntentTimer.current !== null) {
+        clearTimeout(paintIntentTimer.current)
+        paintIntentTimer.current = null
+      }
+      paintIntentCoords.current = null
+    }
+  }, [toolMode])
+
   const getPixelCoordinates = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current
     if (!canvas) return null
@@ -242,6 +256,12 @@ export function PixelCanvas() {
   const handleCanvasTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       // Two-finger gesture for pan/zoom
+      // Cancel any pending paint intent
+      if (paintIntentTimer.current !== null) {
+        clearTimeout(paintIntentTimer.current)
+        paintIntentTimer.current = null
+      }
+      paintIntentCoords.current = null
       handleTouchStart(e)
       return
     }
@@ -251,29 +271,54 @@ export function PixelCanvas() {
       const coords = getPixelCoordinates(t.clientX, t.clientY)
       if (!coords) return
 
-      if (toolMode === "text") {
-        setTextInputPosition(coords)
-      } else if (toolMode === "paint") {
-        setIsDrawing(true)
-        // Paint initial point
-        const halfBrush = Math.floor(brushSize / 2)
-        for (let dx = -halfBrush; dx < brushSize - halfBrush; dx++) {
-          for (let dy = -halfBrush; dy < brushSize - halfBrush; dy++) {
-            addPixel({ x: coords.x + dx, y: coords.y + dy, color: selectedColor, letter: undefined })
+      // Defer action slightly to distinguish between single-touch paint and beginning of pinch
+      paintIntentCoords.current = coords
+      if (paintIntentTimer.current !== null) {
+        clearTimeout(paintIntentTimer.current)
+      }
+      paintIntentTimer.current = window.setTimeout(() => {
+        // If no second touch arrived, commit the intended action
+        if (!paintIntentCoords.current) return
+        if (toolMode === "text") {
+          setTextInputPosition(paintIntentCoords.current)
+        } else if (toolMode === "paint") {
+          setIsDrawing(true)
+          const halfBrush = Math.floor(brushSize / 2)
+          for (let dx = -halfBrush; dx < brushSize - halfBrush; dx++) {
+            for (let dy = -halfBrush; dy < brushSize - halfBrush; dy++) {
+              addPixel({
+                x: paintIntentCoords.current!.x + dx,
+                y: paintIntentCoords.current!.y + dy,
+                color: selectedColor,
+                letter: undefined,
+              })
+            }
           }
         }
-      }
+        // Clear intent after handling
+        paintIntentCoords.current = null
+        paintIntentTimer.current = null
+      }, 120)
     }
   }
 
   const handleCanvasTouchMove = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       // Pan/zoom with two fingers
+      // Cancel any pending paint intent when a second finger joins
+      if (paintIntentTimer.current !== null) {
+        clearTimeout(paintIntentTimer.current)
+        paintIntentTimer.current = null
+      }
+      paintIntentCoords.current = null
       handleTouchMove(e)
       return
     }
 
-    if (e.touches.length === 1 && toolMode === "paint" && isDrawing) {
+    if (e.touches.length === 1 && toolMode === "paint") {
+      // If paint intent hasn't fired yet, don't paint on move
+      if (paintIntentTimer.current !== null) return
+      if (!isDrawing) return
       e.preventDefault()
       const t = e.touches[0]
       const coords = getPixelCoordinates(t.clientX, t.clientY)
@@ -297,6 +342,12 @@ export function PixelCanvas() {
     if (e.touches.length === 0) {
       setIsDrawing(false)
     }
+    // Clear any pending paint intent if touch ends before it fires
+    if (paintIntentTimer.current !== null) {
+      clearTimeout(paintIntentTimer.current)
+      paintIntentTimer.current = null
+    }
+    paintIntentCoords.current = null
   }
 
   return (
