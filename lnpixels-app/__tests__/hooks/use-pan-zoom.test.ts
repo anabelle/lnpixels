@@ -105,33 +105,33 @@ describe('usePanZoom', () => {
     expect(mockSetZoom).toHaveBeenCalledWith(9) // 10 * 0.9 = 9
   })
 
-  it('should handle space key press', () => {
+  it('should handle shift key press', () => {
     const { result } = renderHook(() => usePanZoom(containerRef))
-
-    const keydownEvent = new KeyboardEvent('keydown', { code: 'Space' })
-    const keyupEvent = new KeyboardEvent('keyup', { code: 'Space' })
+    
+    const keydownEvent = new KeyboardEvent('keydown', { code: 'ShiftLeft' })
+    const keyupEvent = new KeyboardEvent('keyup', { code: 'ShiftLeft' })
 
     act(() => {
       window.dispatchEvent(keydownEvent)
     })
 
-    expect(result.current.isSpacePressed).toBe(true)
+    expect(result.current.isShiftPressed).toBe(true)
     expect(mockContainer.style.cursor).toBe('grab')
 
     act(() => {
       window.dispatchEvent(keyupEvent)
     })
 
-    expect(result.current.isSpacePressed).toBe(false)
+    expect(result.current.isShiftPressed).toBe(false)
     expect(mockContainer.style.cursor).toBe('crosshair')
   })
 
-  it('should handle mouse down with space pressed', () => {
+  it('should handle mouse down with shift pressed', () => {
     const { result } = renderHook(() => usePanZoom(containerRef))
 
-    // Press space first
+    // Press shift first
     act(() => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ShiftLeft' }))
     })
 
     const mockEvent = {
