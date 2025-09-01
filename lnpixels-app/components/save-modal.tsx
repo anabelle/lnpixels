@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { QrCode, Copy, Check, Zap, CheckCircle } from "lucide-react"
+import QRCode from "react-qr-code"
 import { usePixelStore } from "@/hooks/use-pixel-store"
 
 interface SaveModalProps {
@@ -238,9 +239,9 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
       });
       setPixelUpdates(updates);
 
-      // Generate a simple QR code placeholder (you might want to use a QR code library)
-      const qrCodeData = `lightning:${invoiceData.invoice}`;
-      setQrCode(qrCodeData);
+  // Generate QR data for the Lightning invoice
+  const qrCodeData = `lightning:${invoiceData.invoice}`
+  setQrCode(qrCodeData)
 
     } catch (error) {
       console.error("Failed to generate invoice:", error)
@@ -281,11 +282,9 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
       
       setError(errorMessage)
       // Fallback to mock invoice if API fails
-      const mockInvoice = `lnbc${totalCost}u1p...mock_invoice_for_${totalPixels}_pixels`
-      const mockQrCode = `data:image/svg+xml;base64,${btoa(`<svg>Mock QR Code for ${mockInvoice}</svg>`)}`
-
-      setInvoice(mockInvoice)
-      setQrCode(mockQrCode)
+  const mockInvoice = `lnbc${totalCost}u1p...mock_invoice_for_${totalPixels}_pixels`
+  setInvoice(mockInvoice)
+  setQrCode(`lightning:${mockInvoice}`)
     } finally {
       setLoading(false)
     }
@@ -404,8 +403,12 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
           {invoice && !paymentConfirmed && (
             <Card className="p-4 space-y-4">
               <div className="text-center">
-                <div className="w-48 h-48 mx-auto bg-muted rounded-lg flex items-center justify-center">
-                  <QrCode className="h-24 w-24 text-muted-foreground" />
+                <div className="w-48 h-48 mx-auto bg-white rounded-lg flex items-center justify-center p-2">
+                  {qrCode ? (
+                    <QRCode value={qrCode} size={176} style={{ height: '176px', width: '176px' }} />
+                  ) : (
+                    <QrCode className="h-24 w-24 text-muted-foreground" />
+                  )}
                 </div>
               </div>
 
