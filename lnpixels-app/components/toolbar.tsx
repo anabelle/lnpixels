@@ -2,16 +2,17 @@
 
 import { Button } from "@/components/ui/button"
 import { usePixelStore } from "@/hooks/use-pixel-store"
-import { Activity, ZoomIn, ZoomOut, Home, Save, Trash2, Minus, Plus, Paintbrush, Type } from "lucide-react"
+import { Activity, ZoomIn, ZoomOut, Home, Save, Trash2, Minus, Plus, Paintbrush, Type, HelpCircle } from "lucide-react"
 import { useState } from "react"
 import { ColorPicker } from "./color-picker"
 import { ThemeToggle } from "./theme-toggle"
 
 interface ToolbarProps {
   onToggleActivity: () => void
+  onOpenInfo?: () => void
 }
 
-export function Toolbar({ onToggleActivity }: ToolbarProps) {
+export function Toolbar({ onToggleActivity, onOpenInfo }: ToolbarProps) {
   const {
     selectedColor,
     setSelectedColor,
@@ -127,6 +128,12 @@ export function Toolbar({ onToggleActivity }: ToolbarProps) {
         <div className="flex items-center gap-2">
           <ThemeToggle />
 
+          {onOpenInfo && (
+            <Button size="sm" variant="ghost" onClick={onOpenInfo} className="h-8 w-8 p-0" aria-label="Help / Info">
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          )}
+
           <Button size="sm" variant="ghost" onClick={onToggleActivity} className="h-8 w-8 p-0" aria-label="Toggle activity">
             <Activity className="h-4 w-4" />
           </Button>
@@ -237,6 +244,12 @@ export function Toolbar({ onToggleActivity }: ToolbarProps) {
         {/* Actions section */}
         <div className="flex flex-col items-center gap-1 border-t pt-2">
           <ThemeToggle />
+
+          {onOpenInfo && (
+            <Button size="sm" variant="ghost" onClick={onOpenInfo} className="h-6 w-6 p-0" aria-label="Help / Info">
+              <HelpCircle className="h-3 w-3" />
+            </Button>
+          )}
 
           <Button size="sm" variant="ghost" onClick={onToggleActivity} className="h-6 w-6 p-0" aria-label="Toggle activity">
             <Activity className="h-3 w-3" />
