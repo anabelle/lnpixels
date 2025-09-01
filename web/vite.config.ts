@@ -6,7 +6,7 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
-    allowedHosts: ['vm-522.lnvps.cloud', 'localhost', 'lnpixels.heyanabelle.com', 'pixel.xx.kg', 'lnpixels.qzz.io'],
+    allowedHosts: ['vm-522.lnvps.cloud', 'localhost', 'lnpixels.heyanabelle.com', 'pixel.xx.kg', 'ln.pixel.xx.kg'],
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
