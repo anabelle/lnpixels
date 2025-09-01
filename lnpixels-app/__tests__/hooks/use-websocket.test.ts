@@ -20,11 +20,13 @@ vi.mock('socket.io-client', () => ({
 // Mock the use-pixel-store hook - only mock the functions used by useWebSocket
 const mockAddPixel = vi.fn()
 const mockUpdatePixels = vi.fn()
+const mockAddExistingPixel = vi.fn()
 
 vi.mock('@/hooks/use-pixel-store', () => ({
   usePixelStore: vi.fn(() => ({
     addPixel: mockAddPixel,
     updatePixels: mockUpdatePixels,
+  addExistingPixel: mockAddExistingPixel,
     // Include other properties that might be accessed
     pixels: [],
     selectedColor: '#000000',
@@ -57,7 +59,7 @@ describe('useWebSocket', () => {
   it('should connect to websocket server', () => {
     renderHook(() => useWebSocket())
 
-    expect(io).toHaveBeenCalledWith('http://localhost:3001/api', {
+  expect(io).toHaveBeenCalledWith('http://localhost:3000/api', {
       transports: ['websocket', 'polling'],
     })
   })
@@ -67,15 +69,15 @@ describe('useWebSocket', () => {
 
     expect(mockSocket.on).toHaveBeenCalledWith('connect', expect.any(Function))
     expect(mockSocket.on).toHaveBeenCalledWith('disconnect', expect.any(Function))
-    expect(mockSocket.on).toHaveBeenCalledWith('pixel_update', expect.any(Function))
-    expect(mockSocket.on).toHaveBeenCalledWith('bulk_pixel_update', expect.any(Function))
+  expect(mockSocket.on).toHaveBeenCalledWith('pixel.update', expect.any(Function))
+  expect(mockSocket.on).toHaveBeenCalledWith('activity.append', expect.any(Function))
   })
 
-  it('should handle pixel_update event', () => {
+  it('should handle pixel.update event', () => {
     renderHook(() => useWebSocket())
 
     const pixelUpdateCall = mockSocket.on.mock.calls.find(
-      (call: any[]) => call[0] === 'pixel_update'
+      (call: any[]) => call[0] === 'pixel.update'
     )
     expect(pixelUpdateCall).toBeDefined()
     const pixelUpdateHandler = pixelUpdateCall![1]
@@ -92,36 +94,13 @@ describe('useWebSocket', () => {
       pixelUpdateHandler(pixelData)
     })
 
-    expect(mockAddPixel).toHaveBeenCalledWith({
+  expect(mockAddExistingPixel).toHaveBeenCalledWith({
       x: 10,
       y: 20,
       color: '#ff0000',
       letter: 'A',
       sats: 100,
     })
-  })
-
-  it('should handle bulk_pixel_update event', () => {
-    renderHook(() => useWebSocket())
-
-    const bulkUpdateCall = mockSocket.on.mock.calls.find(
-      (call: any[]) => call[0] === 'bulk_pixel_update'
-    )
-    expect(bulkUpdateCall).toBeDefined()
-    const bulkUpdateHandler = bulkUpdateCall![1]
-
-    const bulkData = {
-      pixels: [
-        { x: 1, y: 1, color: '#ff0000' },
-        { x: 2, y: 2, color: '#00ff00' },
-      ],
-    }
-
-    act(() => {
-      bulkUpdateHandler(bulkData)
-    })
-
-    expect(mockUpdatePixels).toHaveBeenCalledWith(bulkData.pixels)
   })
 
   it('should disconnect socket on unmount', () => {

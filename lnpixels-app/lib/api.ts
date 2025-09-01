@@ -19,14 +19,16 @@ export interface InvoiceResponse {
 }
 
 export interface ActivityItem {
-  id: string;
-  type: 'purchase' | 'update';
+  id?: number;
   x: number;
   y: number;
   color: string;
   letter?: string;
-  amount: number;
-  timestamp: string;
+  sats: number;
+  created_at: number;
+  payment_hash: string;
+  event_id?: string;
+  type: string;
 }
 
 export class ApiClient {
@@ -92,7 +94,8 @@ export class ApiClient {
   // Get activity feed
   async getActivity(limit?: number): Promise<ActivityItem[]> {
     const query = limit ? `?limit=${limit}` : '';
-    return this.request<ActivityItem[]>(`/activity${query}`);
+    const data = await this.request<{ events: ActivityItem[] }>(`/activity${query}`);
+    return Array.isArray((data as any)?.events) ? (data as any).events : [];
   }
 
   // Verify payment event

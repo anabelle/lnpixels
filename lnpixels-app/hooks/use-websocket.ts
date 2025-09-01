@@ -37,11 +37,15 @@ export function useWebSocket() {
       })
     })
 
-    // Listen for activity updates
+    // Listen for activity updates and broadcast as CustomEvent like the web app
     socket.on("activity.append", (data) => {
       console.log("Received activity update:", data)
-      // For now, we'll just log activity updates
-      // You could add activity state management here if needed
+      try {
+        if (!data || typeof data.created_at !== "number" || isNaN(data.created_at)) return
+        window.dispatchEvent(new CustomEvent('activityUpdate', { detail: data }))
+      } catch (e) {
+        console.error('Error dispatching activityUpdate event', e)
+      }
     })
 
     // Listen for payment confirmations
