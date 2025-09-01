@@ -9,6 +9,8 @@ export function setupSocket(app: express.Application) {
       origin: [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
         "https://lnpixels.heyanabelle.com",
         "https://vm-522.lnvps.cloud",
         "http://lnpixels.qzz.io",
