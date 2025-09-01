@@ -10,7 +10,7 @@ export function useWebSocket() {
 
   useEffect(() => {
     // Connect to the WebSocket server
-    const socket = io("http://localhost:3000/api", {
+    const socket = io("https://lnpixels.qzz.io/api", {
       transports: ["websocket", "polling"],
     })
 
