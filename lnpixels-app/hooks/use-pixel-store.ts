@@ -1,6 +1,6 @@
 "use client"
 
-import { create } from "zustand"
+import { create } from "zustand/react"
 import { apiClient, Pixel as ApiPixel } from "@/lib/api"
 
 interface PixelData {
@@ -96,6 +96,7 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
     } catch (error) {
       console.error('Failed to fetch pixels:', error);
       set({
+  pixels: [],
         error: error instanceof Error ? error.message : 'Failed to fetch pixels',
         isLoading: false
       });

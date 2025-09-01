@@ -150,7 +150,17 @@ function toast({ ...props }: Toast) {
       type: "UPDATE_TOAST",
       toast: { ...props, id },
     })
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
+  const dismiss = () => {
+    // Ensure consumer onOpenChange is notified when programmatically dismissed
+    if (originalOnOpenChange) {
+      try {
+        originalOnOpenChange(false)
+      } catch {}
+    }
+    dispatch({ type: "DISMISS_TOAST", toastId: id })
+  }
+
+  const originalOnOpenChange = props.onOpenChange
 
   dispatch({
     type: "ADD_TOAST",
@@ -160,6 +170,10 @@ function toast({ ...props }: Toast) {
       open: true,
       onOpenChange: (open) => {
         if (!open) dismiss()
+        // Call the original onOpenChange if it exists
+        if (originalOnOpenChange) {
+          originalOnOpenChange(open)
+        }
       },
     },
   })
@@ -187,7 +201,18 @@ function useToast() {
   return {
     ...state,
     toast,
-    dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
+    dismiss: (toastId?: string) => {
+      // Invoke onOpenChange(false) for dismissed toast(s) to notify consumers
+      const targets = toastId
+        ? memoryState.toasts.filter((t) => t.id === toastId)
+        : memoryState.toasts
+      for (const t of targets) {
+        try {
+          t.onOpenChange?.(false)
+        } catch {}
+      }
+      dispatch({ type: "DISMISS_TOAST", toastId })
+    },
   }
 }
 

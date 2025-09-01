@@ -27,7 +27,7 @@ export interface ActivityItem {
   timestamp: string;
 }
 
-class ApiClient {
+export class ApiClient {
   private baseUrl: string;
 
   constructor(baseUrl: string = API_BASE_URL) {
