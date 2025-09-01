@@ -123,3 +123,76 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Animated Pixel Character */
+.pixel-character-container {
+  flex-shrink: 0;
+}
+
+.pixel-character {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #ff6b6b, #4ecdc4);
+  border-radius: 6px;
+  position: relative;
+  animation: pixelBounce 2s ease-in-out infinite;
+  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes pixelBounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  40% {
+    transform: translateY(-4px) scale(1.05);
+  }
+  60% {
+    transform: translateY(-2px) scale(1.02);
+  }
+}
+
+.pixel-face {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.pixel-eye {
+  width: 4px;
+  height: 4px;
+  background: #333;
+  border-radius: 50%;
+  animation: pixelBlink 3s ease-in-out infinite;
+}
+
+@keyframes pixelBlink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+
+.pixel-mouth {
+  width: 8px;
+  height: 4px;
+  border: 1px solid #333;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  margin-top: 1px;
+}
+
+/* Dark mode adjustments */
+.dark .pixel-eye {
+  background: #fff;
+}
+
+.dark .pixel-mouth {
+  border-color: #fff;
+}

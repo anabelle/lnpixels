@@ -18,8 +18,16 @@ export function InfoModal({ isOpen, onClose, onGetStarted }: InfoModalProps) {
         <div className="p-6 border-b bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3 text-xl">
-              <div className="w-8 h-8 bg-blue-500 rounded-sm flex items-center justify-center text-white font-bold text-sm">
-                P
+              <div className="pixel-character-container">
+                <div className="pixel-character">
+                  <div className="pixel-face">
+                    <div className="flex gap-1">
+                      <div className="pixel-eye"></div>
+                      <div className="pixel-eye"></div>
+                    </div>
+                    <div className="pixel-mouth"></div>
+                  </div>
+                </div>
               </div>
               <div>
                 <div>hey! i'm Pixel 👾</div>
@@ -61,9 +69,12 @@ export function InfoModal({ isOpen, onClose, onGetStarted }: InfoModalProps) {
                   <ul className="text-sm text-green-800 dark:text-green-200 space-y-1">
                     <li>• pick a color (any color!)</li>
                     <li>• choose your brush size</li>
-                    <li>• click & drag to paint</li>
-                    <li>• hit save when done</li>
+                    <li>• <strong>paint freely</strong> - experiment all you want!</li>
+                    <li>• <strong>save when happy</strong> - only saved pixels are preserved</li>
                   </ul>
+                  <div className="mt-2 text-xs text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30 rounded px-2 py-1">
+                    💡 tip: unsaved pixels disappear on refresh - save to make them permanent!
+                  </div>
                 </div>
                 
                 <div className="bg-purple-50 dark:bg-purple-950/20 rounded-lg p-3 border border-purple-200 dark:border-purple-800">
@@ -71,9 +82,12 @@ export function InfoModal({ isOpen, onClose, onGetStarted }: InfoModalProps) {
                   <ul className="text-sm text-purple-800 dark:text-purple-200 space-y-1">
                     <li>• switch to text tool</li>
                     <li>• click where you want text</li>
-                    <li>• type letters (they appear!)</li>
-                    <li>• save your message</li>
+                    <li>• <strong>type freely</strong> - try different messages!</li>
+                    <li>• <strong>save to preserve</strong> your words forever</li>
                   </ul>
+                  <div className="mt-2 text-xs text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/30 rounded px-2 py-1">
+                    💡 tip: draft your text without worry - only saved letters stay permanent!
+                  </div>
                 </div>
               </div>
 
