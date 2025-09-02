@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import path from 'path';
+import fs from 'fs';
 
 // Database schema
 const CREATE_PIXELS_TABLE = `
@@ -63,8 +64,11 @@ export interface Activity {
 
 export class PixelDatabase {
   private db: Database.Database;
+  private dbPath: string;
 
   constructor(dbPath: string = './pixels.db') {
+    this.dbPath = dbPath;
+
     // Ensure the directory exists
     const dbDir = path.dirname(dbPath);
     if (dbDir !== '.') {
@@ -214,6 +218,20 @@ export class PixelDatabase {
     `);
 
     return stmt.all(limit) as Activity[];
+  }
+
+  // Create database backup
+  createBackup(backupPath?: string): string {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const defaultPath = `./pixels_backup_${timestamp}.db`;
+    const finalPath = backupPath || defaultPath;
+
+    // For SQLite, we can use the backup API or just copy the file
+    // Since better-sqlite3 doesn't have built-in backup, we'll use filesystem copy
+    fs.copyFileSync(this.dbPath, finalPath);
+
+    console.log(`Database backup created: ${finalPath}`);
+    return finalPath;
   }
 
   // Close database connection
