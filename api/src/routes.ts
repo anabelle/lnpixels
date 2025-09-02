@@ -351,11 +351,13 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
               });
 
               // Emit activity summary for bulk purchase
-              if (activityRecords.length > 0) {
+        if (activityRecords.length > 0) {
                 const summaryActivity = {
                   ...activityRecords[0], // Use first record as base
                   summary: `${activityRecords.length} pixels purchased`,
-                  type: 'bulk_purchase'
+          type: 'bulk_purchase',
+          pixelCount: activityRecords.length,
+          totalSats: typeof payload?.amount === 'number' ? payload.amount : activityRecords.reduce((sum: number, r: any) => sum + (r?.sats || 0), 0)
                 };
                 console.log('Emitting bulk activity.append event:', summaryActivity);
                 io.emit('activity.append', summaryActivity);
@@ -393,7 +395,10 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
               );
               savedPixels.forEach(pixel => io.emit('pixel.update', pixel));
               if (activityRecords.length > 0) {
-                const summaryActivity = { ...activityRecords[0], summary: `${activityRecords.length} pixels purchased`, type: 'bulk_purchase' };
+                const totalSats = Array.isArray(metadata?.pixelUpdates)
+                  ? metadata.pixelUpdates.reduce((sum: number, u: any) => sum + (u?.price || 0), 0)
+                  : activityRecords.reduce((sum: number, r: any) => sum + (r?.sats || 0), 0);
+                const summaryActivity = { ...activityRecords[0], summary: `${activityRecords.length} pixels purchased`, type: 'bulk_purchase', pixelCount: activityRecords.length, totalSats };
                 io.emit('activity.append', summaryActivity);
               }
             } catch (error) {
@@ -581,6 +586,20 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
              io.emit('pixel.update', pixel);
            });
 
+           // Emit activity summary for bulk purchase (mirror production behavior)
+           if (activityRecords.length > 0) {
+             const totalSats = quote.pixelUpdates.reduce((sum: number, u: any) => sum + (u?.price || 0), 0);
+             const summaryActivity = {
+               ...activityRecords[0],
+               summary: `${activityRecords.length} pixels purchased`,
+               type: 'bulk_purchase',
+               pixelCount: activityRecords.length,
+               totalSats
+             };
+             console.log('Emitting bulk activity.append event (test, quote):', summaryActivity);
+             io.emit('activity.append', summaryActivity);
+           }
+
            // Emit payment confirmation event
            io.emit('payment.confirmed', {
              paymentId: paymentId,
@@ -630,6 +649,14 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
              console.log('Emitting pixel.update for test payment:', pixel);
              io.emit('pixel.update', pixel);
            });
+
+           // Emit activity summary for bulk purchase (mirror production behavior)
+           if (activityRecords.length > 0) {
+             const totalSats = pixelUpdates.reduce((sum: number, u: any) => sum + (u?.price || 0), 0);
+             const summaryActivity = { ...activityRecords[0], summary: `${activityRecords.length} pixels purchased`, type: 'bulk_purchase', pixelCount: activityRecords.length, totalSats };
+             console.log('Emitting bulk activity.append event (test, pixelUpdates):', summaryActivity);
+             io.emit('activity.append', summaryActivity);
+           }
 
            // Emit payment confirmation event
            io.emit('payment.confirmed', {
