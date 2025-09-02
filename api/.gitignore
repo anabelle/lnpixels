@@ -1,0 +1,32 @@
+# Database backups
+backups/
+*.db.gz
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+
+# Node modules
+node_modules/
+
+# Build artifacts
+dist/
+build/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
