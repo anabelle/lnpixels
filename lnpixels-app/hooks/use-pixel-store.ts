@@ -3,12 +3,7 @@
 import { create } from "zustand/react"
 import { apiClient, Pixel as ApiPixel } from "@/lib/api"
 
-interface PixelData {
-  x: number
-  y: number
-  color: string
-  letter?: string
-}
+
 
 interface SaveModal {
   isOpen: boolean
@@ -86,10 +81,15 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
       const existingPixel = state.pixels.find((p) => p.x === pixel.x && p.y === pixel.y)
       let originalPixel: Pixel | undefined
 
-      if (existingPixel && !existingPixel.isNew) {
-        // Create a clean copy of the original pixel without originalPixel field to avoid circular refs
-        const { originalPixel: _, ...cleanOriginal } = existingPixel
-        originalPixel = { ...cleanOriginal, isNew: false }
+      if (existingPixel) {
+        if (!existingPixel.isNew) {
+          // Overwriting a permanent pixel - store it for restoration
+          const { originalPixel: _, ...cleanOriginal } = existingPixel
+          originalPixel = { ...cleanOriginal, isNew: false }
+        } else if (existingPixel.originalPixel) {
+          // Overwriting a new pixel that already has an originalPixel - preserve the chain
+          originalPixel = existingPixel.originalPixel
+        }
       }
 
       const newPixel = {
@@ -213,7 +213,7 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
     // Clear new pixels (user-drawn), but restore original pixels if they were overwritten
     set((state) => {
       const existingPixels = state.pixels.filter(pixel => pixel.isNew !== true)
-      const overwrittenPixels = state.pixels
+      const restoredPixels = state.pixels
         .filter(pixel => pixel.isNew === true && pixel.originalPixel)
         .map(pixel => {
           // Create a clean copy of the original pixel without originalPixel field to avoid circular refs
@@ -225,11 +225,11 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
       const pixelMap = new Map<string, Pixel>()
       const key = (p: Pixel) => `${p.x}:${p.y}`
 
-      // Add existing pixels first
+      // Add existing pixels first (these are permanent pixels that weren't overwritten)
       existingPixels.forEach(pixel => pixelMap.set(key(pixel), pixel))
 
-      // Add restored original pixels (these will overwrite any existing ones at same position)
-      overwrittenPixels.forEach(pixel => pixelMap.set(key(pixel), pixel))
+      // Add restored original pixels (these restore permanent pixels that were overwritten)
+      restoredPixels.forEach(pixel => pixelMap.set(key(pixel), pixel))
 
       return { pixels: Array.from(pixelMap.values()) }
     })
