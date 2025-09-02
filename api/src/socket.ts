@@ -13,10 +13,9 @@ export function setupSocket(app: express.Application) {
         "http://127.0.0.1:3001",
         "http://localhost:3002", // Next.js app port
         "http://127.0.0.1:3002",
-        "https://lnpixels.heyanabelle.com",
+        "https://ln.pixel.xx.kg",
         "https://vm-522.lnvps.cloud",
-        "http://ln.pixel.xx.kg",
-        "https://ln.pixel.xx.kg"
+        "http://ln.pixel.xx.kg"
       ],
       methods: ["GET", "POST"],
       credentials: true
