@@ -153,6 +153,64 @@ describe('usePixelStore', () => {
     expect(result.current.pixels).toEqual([])
   })
 
+  it('should restore permanent pixels when clearing canvas', () => {
+    const { result } = renderHook(() => usePixelStore())
+
+    // Add a permanent pixel (simulating one loaded from database)
+    const permanentPixel = { x: 0, y: 0, color: '#000000', sats: 10, isNew: false }
+    act(() => {
+      result.current.addExistingPixel(permanentPixel)
+    })
+
+    // User paints over the permanent pixel
+    act(() => {
+      result.current.addPixel({ x: 0, y: 0, color: '#ff0000' })
+    })
+
+    // Verify the permanent pixel is overwritten
+    expect(result.current.pixels).toHaveLength(1)
+    expect(result.current.pixels[0].color).toBe('#ff0000')
+    expect(result.current.pixels[0].isNew).toBe(true)
+    expect(result.current.pixels[0].originalPixel).toEqual(permanentPixel)
+
+    // Clear canvas - should restore the permanent pixel
+    act(() => {
+      result.current.clearCanvas()
+    })
+
+    expect(result.current.pixels).toHaveLength(1)
+    expect(result.current.pixels[0]).toEqual(permanentPixel)
+  })
+
+  it('should handle multiple overwritten pixels correctly', () => {
+    const { result } = renderHook(() => usePixelStore())
+
+    // Add multiple permanent pixels
+    const permanentPixel1 = { x: 0, y: 0, color: '#000000', sats: 10, isNew: false }
+    const permanentPixel2 = { x: 1, y: 1, color: '#ffffff', sats: 5, isNew: false }
+
+    act(() => {
+      result.current.addExistingPixel(permanentPixel1)
+      result.current.addExistingPixel(permanentPixel2)
+    })
+
+    // User paints over both
+    act(() => {
+      result.current.addPixel({ x: 0, y: 0, color: '#ff0000' })
+      result.current.addPixel({ x: 1, y: 1, color: '#00ff00' })
+    })
+
+    // Clear canvas - should restore both permanent pixels
+    act(() => {
+      result.current.clearCanvas()
+    })
+
+    expect(result.current.pixels).toHaveLength(2)
+    const pixelMap = new Map(result.current.pixels.map(p => [`${p.x}:${p.y}`, p]))
+    expect(pixelMap.get('0:0')).toEqual(permanentPixel1)
+    expect(pixelMap.get('1:1')).toEqual(permanentPixel2)
+  })
+
   it('should open save modal with correct calculations', () => {
     const { result } = renderHook(() => usePixelStore())
 
