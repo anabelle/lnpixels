@@ -486,7 +486,7 @@ export function PixelCanvas() {
       </div>
 
       {toolMode === "text" && (
-        <div className="absolute top-4 right-4 bg-card/90 backdrop-blur-sm px-3 py-2 rounded-lg text-sm">
+        <div className="absolute top-4 md:top-20 right-4 bg-card/90 backdrop-blur-sm px-3 py-2 rounded-lg text-sm">
           <div className="font-semibold mb-1">Text Mode</div>
           <div>Click to place cursor</div>
           <div>Type to add letters</div>
@@ -496,6 +496,22 @@ export function PixelCanvas() {
               📱 Keyboard should open automatically
             </div>
           )}
+        </div>
+      )}
+
+      {toolMode !== "text" && (
+        <div className="absolute top-4 md:top-20 right-4 bg-card/90 backdrop-blur-sm px-3 py-2 rounded-lg text-sm">
+          <div className="font-semibold mb-1">Navigation</div>
+          {/* Desktop tips */}
+          <div className="hidden md:block">
+            <div>Shift+click to pan</div>
+            <div>Scroll to zoom</div>
+          </div>
+          {/* Mobile tips */}
+          <div className="md:hidden">
+            <div>Pinch to zoom</div>
+            <div>Two fingers to pan</div>
+          </div>
         </div>
       )}
     </div>
