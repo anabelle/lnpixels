@@ -17,14 +17,13 @@ module.exports = {
       min_uptime: '5s'
     },
     {
-      name: 'lnpixels-web',
-      script: './start-dev.sh',
-      cwd: '/home/ubuntu/lnpixels/web',
+      name: 'lnpixels-app',
+      script: 'npm run start',
+      cwd: '/home/ubuntu/lnpixels/lnpixels-app',
       env: {
-        NODE_ENV: 'development'
+        NODE_ENV: 'production',
+        PORT: 3002
       },
-      watch: true,
-      ignore_watch: ['node_modules', 'test', 'dist'],
       restart_delay: 4000,
       max_restarts: 5,
       min_uptime: '5s'

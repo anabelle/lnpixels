@@ -4,11 +4,10 @@
   "description": "LNPixels project",
   "scripts": {
     "dev:api": "pnpm --filter api dev",
-    "dev:web": "pnpm --filter web dev",
-    "dev:app": "pnpm --filter my-v0-project dev",
-    "dev:all": "pnpm --parallel --filter \"api\" --filter \"my-v0-project\" dev",
-    "build": "pnpm --filter api build && pnpm --filter web build && pnpm --filter my-v0-project build",
-    "test": "pnpm --filter api test && pnpm --filter web test && pnpm --filter my-v0-project test",
+    "dev:app": "pnpm --filter lnpixels-app dev",
+    "dev:all": "pnpm --parallel --filter \"api\" --filter \"lnpixels-app\" dev",
+    "build": "pnpm --filter api build && pnpm --filter lnpixels-app build",
+    "test": "pnpm --filter api test && pnpm --filter lnpixels-app test",
     "install-all": "pnpm install"
   },
   "devDependencies": {
