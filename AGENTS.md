@@ -21,14 +21,14 @@ Workflow (red → green → refactor)
 ---
 
 Project structure (implemented)
-- `api/` Node 18+, Express, Socket.IO, better-sqlite3, nostr-tools, nakapay-sdk
-- `web/` React + TypeScript + Vite, Zustand, socket.io-client, Testing Library, nakapay-react
+- `api/` Node 22+, Express, Socket.IO, better-sqlite3, nostr-tools, nakapay-sdk
+- `lnpixels-app/` Next.js + React 19 + TypeScript, Zustand, socket.io-client, Testing Library
 - `ops/` scripts and CI
-- Tests: `api/test/**`, `web/test/**`
+- Tests: `api/test/**`, `lnpixels-app/__tests__/**`
 
 Recommended dev deps
 - API: Vitest, Supertest, ts-node/tsx, ESLint
-- Web: Vitest, @testing-library/react, @testing-library/user-event, happy-dom, @vitest/coverage-v8
+- App: Vitest, @testing-library/react, @testing-library/user-event, jsdom, @vitest/coverage-v8
 
 ---
 
@@ -103,21 +103,22 @@ Coding standards
 
 Runbook (current implementation)
 ```bash
-# install deps at root if using workspaces
-npm install
+# install deps at root using pnpm workspaces
+pnpm install
 
 # run API unit + integration tests
-cd api && npm run test
+cd api && pnpm run test
 
-# run Web tests (note: coverage has happy-dom dependency issue)
-cd web && npm run test
+# run App tests
+cd lnpixels-app && pnpm run test
 
 # run full suite (CI equivalent)
-npm run test
+pnpm run test
 
 # start development servers
-cd api && npm run dev    # API server on port 3000
-cd web && npm run dev    # Frontend on port 5173
+pnpm run dev:api    # API server on port 3000
+pnpm run dev:app    # App server on port 3002
+pnpm run dev:all    # Start both servers
 
 # payment integration setup
 # 1. Add NAKAPAY_API_KEY to api/.env

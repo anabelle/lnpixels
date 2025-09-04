@@ -13,6 +13,21 @@ A collaborative pixel art platform built with Lightning Network payments. Create
 - **Development Ready**: Hot reload, TypeScript, and modern tooling
 - **Comprehensive Testing**: TDD approach with extensive test coverage
 
+# LNPixels 🎨
+
+A collaborative pixel art platform built with Lightning Network payments. Create, share, and monetize pixel art on a decentralized canvas.
+
+## 🌟 Features
+
+- **Collaborative Canvas**: Real-time pixel art creation with multiple users
+- **Lightning Network Integration**: Pay-per-pixel with instant Bitcoin payments via NakaPay
+- **QR Code Payments**: Scan QR codes with any Lightning wallet
+- **WebSocket Real-time Updates**: Live canvas updates for all connected users
+- **Professional Payment UI**: Polished modal with invoice display and error handling
+- **Responsive Design**: Works on desktop and mobile devices
+- **Development Ready**: Hot reload, TypeScript, and modern tooling
+- **Comprehensive Testing**: TDD approach with extensive test coverage
+
 ## 🏗️ Architecture
 
 ### Backend (API)
@@ -22,18 +37,18 @@ A collaborative pixel art platform built with Lightning Network payments. Create
 - **Payments**: Lightning Network integration via Nakapay
 - **Development**: Hot reload with tsx
 
-### Frontend (Web)
-- **Framework**: React + TypeScript + Vite
+### Frontend (App)
+- **Framework**: Next.js + React 19 + TypeScript
 - **State Management**: Zustand
 - **Real-time**: Socket.IO client
 - **Styling**: Tailwind CSS + shadcn/ui
-- **Development**: Hot Module Replacement (HMR)
+- **Development**: Next.js development server with hot reload
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+ (Node 20+ recommended)
-- npm or yarn
+- Node.js 22+ (recommended, see .nvmrc)
+- pnpm (recommended) or npm
 - Git
 
 ### Installation
@@ -46,22 +61,22 @@ A collaborative pixel art platform built with Lightning Network payments. Create
 
 2. **Install dependencies**
    ```bash
-   npm install
+   pnpm install
    ```
 
 3. **Start development servers**
    ```bash
-   # Start both API and Web servers
-   npm run dev
+   # Start both API and App servers
+   pnpm run dev:all
 
    # Or start individually:
-   npm run dev -w api    # API server on port 3000
-   npm run dev -w web    # Web server on port 5173
+   pnpm run dev:api    # API server on port 3000
+   pnpm run dev:app    # App server on port 3002
    ```
 
 4. **Access the application**
-   - **Development**: http://localhost:5173
-   - **Production**: https://your-domain.com
+   - **API**: http://localhost:3000
+   - **App**: http://localhost:3002
 
 ## 📁 Project Structure
 
@@ -70,22 +85,32 @@ lnpixels/
 ├── api/                    # Backend API server
 │   ├── src/
 │   │   ├── server.ts       # Main Express server
-│   │   └── ...
+│   │   ├── database.ts     # SQLite database setup
+│   │   ├── payments.ts     # Lightning payment integration
+│   │   ├── pricing.ts      # Pixel pricing logic
+│   │   ├── routes.ts       # API route handlers
+│   │   └── socket.ts       # WebSocket server setup
 │   ├── test/               # API tests
 │   ├── package.json
 │   └── tsconfig.json
-├── web/                    # Frontend React app
-│   ├── src/
-│   │   ├── App.tsx         # Main React component
-│   │   ├── main.tsx        # React entry point
-│   │   └── ...
-│   ├── test/               # Frontend tests
+├── lnpixels-app/           # Frontend Next.js app
+│   ├── app/                # Next.js app router
+│   │   ├── globals.css     # Global styles
+│   │   ├── layout.tsx      # Root layout
+│   │   └── page.tsx        # Home page
+│   ├── components/         # React components
+│   │   ├── pixel-canvas.tsx # Main canvas component
+│   │   ├── payment-modal.tsx # Payment interface
+│   │   ├── color-picker.tsx  # Color selection
+│   │   └── ui/             # shadcn/ui components
+│   ├── hooks/              # Custom React hooks
+│   ├── lib/                # Utility functions
 │   ├── package.json
-│   ├── vite.config.ts      # Vite configuration
+│   ├── next.config.mjs     # Next.js configuration
 │   └── tsconfig.json
 ├── ops/                    # Operations and docs
 │   └── design.md           # Project design document
-├── ecosystem.config.js     # PM2 process manager config
+├── ecosystem.config.example.js # PM2 process manager config
 └── README.md              # This file
 ```
 
@@ -95,20 +120,18 @@ lnpixels/
 
 ```bash
 # Install all dependencies
-npm install
+pnpm install
 
 # Start development servers
-npm run dev
+pnpm run dev:all          # Start both API and App
+pnpm run dev:api          # Start API server only
+pnpm run dev:app          # Start App server only
 
 # Run tests
-npm run test
-
-# Run tests for specific workspace
-npm run test -w api    # API tests only
-npm run test -w web    # Web tests only
+pnpm run test             # Run all tests
 
 # Build for production
-npm run build -w web   # Build React app
+pnpm run build            # Build both API and App
 ```
 
 ### Environment Setup
@@ -119,24 +142,25 @@ The application uses development defaults and doesn't require additional environ
 
 ```bash
 # Run all tests
-npm run test
+pnpm run test
 
 # Run API tests only
-cd api && npm run test
+cd api && pnpm run test
 
-# Run Web tests only (note: coverage has happy-dom dependency issue)
-cd web && npm run test
+# Run App tests only
+cd lnpixels-app && pnpm run test
 
 # Run tests in watch mode
-npm run test -- --watch
+pnpm run test -- --watch
 
-# Run tests with coverage (API only, Web has dependency issue)
-cd api && npm run test -- --coverage
+# Run tests with coverage
+cd api && pnpm run test -- --coverage
+cd lnpixels-app && pnpm run test:coverage
 ```
 
 ### Test Coverage
 - **API Tests**: ✅ Complete coverage for pricing, validation, and payment flows
-- **Web Tests**: ✅ PaymentModal (8 tests), ColorPicker (11 tests), Canvas integration
+- **App Tests**: ✅ PaymentModal, ColorPicker, Canvas integration, and component tests
 - **Integration Tests**: ✅ End-to-end payment flows and WebSocket communication
 - **TDD Approach**: ✅ All features developed with red-green-refactor cycles
 
@@ -151,7 +175,7 @@ The project includes PM2 configuration for easy deployment:
 npm install -g pm2
 
 # Start applications with PM2
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.example.js
 
 # Save PM2 configuration for auto-restart
 pm2 save
@@ -165,12 +189,12 @@ pm2 logs
 
 ### Production Deployment
 
-1. **Build the frontend**
+1. **Build the applications**
    ```bash
-   npm run build -w web
+   pnpm run build
    ```
 
-2. **Configure nginx** (see nginx configuration in ecosystem.config.js)
+2. **Configure nginx** (see nginx configuration in ecosystem.config.example.js)
 
 3. **Set up SSL** (using Let's Encrypt/Certbot)
 
@@ -179,9 +203,9 @@ pm2 logs
 ## 🔧 Configuration
 
 ### PM2 Configuration
-The `ecosystem.config.js` file contains:
+The `ecosystem.config.example.js` file contains:
 - API server on port 3000
-- Web server on port 5173
+- App server on port 3002
 - Auto-restart on file changes
 - Memory and CPU monitoring
 
@@ -199,7 +223,7 @@ The LNPixels API provides RESTful endpoints for canvas management, payment proce
 
 ### Base URL
 ```
-https://ln.pixel.xx.kg/api
+http://localhost:3000/api
 ```
 
 ### Authentication
@@ -461,7 +485,7 @@ curl "https://ln.pixel.xx.kg/api/verify/a1b2c3d4e5f6..."
 
 The API also provides real-time updates via WebSocket for live canvas synchronization.
 
-**WebSocket URL:** `wss://ln.pixel.xx.kg`
+**WebSocket URL:** `ws://localhost:3000`
 
 **Connection Example:**
 ```javascript
@@ -573,12 +597,20 @@ X-RateLimit-Reset: 1640995260
 - **Security**: Payment verification and input sanitization
 - **Performance**: Optimized for real-time collaboration
 
+### Technology Stack
+- **Backend**: Node.js + Express + TypeScript + Socket.IO + SQLite
+- **Frontend**: Next.js + React 19 + TypeScript + Tailwind CSS + shadcn/ui
+- **Payments**: Lightning Network via NakaPay SDK
+- **Real-time**: Socket.IO for WebSocket communication
+- **Testing**: Vitest for both backend and frontend
+- **Package Management**: pnpm workspaces for monorepo management
+
 ### Recent Updates
-- ✅ **Fixed Pricing Bug**: Basic pixels now correctly charge 1 sat (was 10 sats)
-- ✅ **Enhanced Payment UI**: Professional modal with QR codes and invoice display
-- ✅ **Improved Error Handling**: Better user feedback and retry mechanisms
-- ✅ **Mobile Optimization**: Responsive design for all screen sizes
-- ✅ **Test Coverage**: 8 PaymentModal tests + comprehensive API testing
+- ✅ **Updated Documentation**: Fixed project structure and technology references
+- ✅ **Next.js Migration**: Frontend migrated from Vite to Next.js with React 19
+- ✅ **Monorepo Setup**: Proper pnpm workspace configuration
+- ✅ **Enhanced API Docs**: Comprehensive API documentation with examples
+- ✅ **Deployment Config**: Updated PM2 configuration for current structure
 
 ## 📈 Performance
 
@@ -607,11 +639,11 @@ npm install --save-dev jsdom
 ```bash
 # Test WebSocket connectivity
 curl -I http://localhost:3000
-curl -I http://localhost:5173
+curl -I http://localhost:3002
 
 # Check if ports are available
-lsof -i :3000
-lsof -i :5173
+netstat -an | findstr :3000
+netstat -an | findstr :3002
 ```
 
 **Database Connection Issues**
@@ -641,15 +673,15 @@ curl -X POST http://localhost:3000/api/payments/webhook \
 **Build Failures**
 ```bash
 # Clear all caches
-npm run clean
-rm -rf node_modules api/node_modules web/node_modules
+pnpm run clean
+rm -rf node_modules api/node_modules lnpixels-app/node_modules
 
 # Reinstall dependencies
-npm install
+pnpm install
 
 # Build step by step
-npm run build -w api
-npm run build -w web
+cd api && pnpm run build
+cd ../lnpixels-app && pnpm run build
 ```
 
 **PM2 Deployment Issues**
@@ -659,17 +691,17 @@ pm2 status
 
 # View logs
 pm2 logs lnpixels-api
-pm2 logs lnpixels-web
+pm2 logs lnpixels-app
 
 # Restart services
-pm2 restart ecosystem.config.js
+pm2 restart ecosystem.config.example.js
 ```
 
 **Environment Configuration Issues**
 ```bash
 # Verify environment files
 cat api/.env
-cat web/.env
+cat lnpixels-app/.env
 
 # Check environment variable loading
 cd api && node -e "console.log(process.env.NAKAPAY_API_KEY)"
