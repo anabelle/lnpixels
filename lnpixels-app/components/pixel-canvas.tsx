@@ -28,7 +28,7 @@ export function PixelCanvas() {
   const paintIntentTimer = useRef<number | null>(null)
   const paintIntentCoords = useRef<{ x: number; y: number } | null>(null)
 
-  const { pixels, selectedColor, brushSize, zoom, panX, panY, toolMode, addPixel, setPan } = usePixelStore()
+  const { pixels, selectedColor, brushSize, zoom, panX, panY, toolMode, addPixel, erasePixelAt, setPan } = usePixelStore()
 
   const {
     handleMouseDown,
@@ -282,7 +282,7 @@ export function PixelCanvas() {
           hiddenInputRef.current.focus()
         }
       }, 100)
-    } else {
+    } else if (toolMode === "paint") {
       const halfBrush = Math.floor(brushSize / 2)
 
       for (let dx = -halfBrush; dx < brushSize - halfBrush; dx++) {
@@ -295,6 +295,13 @@ export function PixelCanvas() {
           })
         }
       }
+    } else if (toolMode === "erase") {
+      const halfBrush = Math.floor(brushSize / 2)
+      for (let dx = -halfBrush; dx < brushSize - halfBrush; dx++) {
+        for (let dy = -halfBrush; dy < brushSize - halfBrush; dy++) {
+          erasePixelAt(coords.x + dx, coords.y + dy)
+        }
+      }
     }
   }
 
@@ -304,8 +311,8 @@ export function PixelCanvas() {
         // Panning mode - don't set drawing state
         handleMouseDown(e)
       } else {
-        // Only set drawing state in paint mode
-        if (toolMode === "paint") {
+  // Only set drawing state in paint/erase modes
+  if (toolMode === "paint" || toolMode === "erase") {
           setIsDrawing(true)
         }
         handleCanvasClick(e)
@@ -316,8 +323,8 @@ export function PixelCanvas() {
   }
 
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
-    // Only draw if we're in paint mode, currently drawing, not panning, and not in shift-pan mode
-    if (isDrawing && !isShiftPressed && toolMode === "paint") {
+  // Only draw if we're in paint/erase mode, currently drawing, not panning, and not in shift-pan mode
+  if (isDrawing && !isShiftPressed && (toolMode === "paint" || toolMode === "erase")) {
       handleCanvasClick(e)
     }
     handleMouseMove()
@@ -380,6 +387,14 @@ export function PixelCanvas() {
               })
             }
           }
+        } else if (toolMode === "erase") {
+          setIsDrawing(true)
+          const halfBrush = Math.floor(brushSize / 2)
+          for (let dx = -halfBrush; dx < brushSize - halfBrush; dx++) {
+            for (let dy = -halfBrush; dy < brushSize - halfBrush; dy++) {
+              erasePixelAt(paintIntentCoords.current!.x + dx, paintIntentCoords.current!.y + dy)
+            }
+          }
         }
         // Clear intent after handling
         paintIntentCoords.current = null
@@ -401,7 +416,7 @@ export function PixelCanvas() {
       return
     }
 
-    if (e.touches.length === 1 && toolMode === "paint") {
+    if (e.touches.length === 1 && (toolMode === "paint" || toolMode === "erase")) {
       // If paint intent hasn't fired yet, don't paint on move
       if (paintIntentTimer.current !== null) return
       if (!isDrawing) return
@@ -413,7 +428,11 @@ export function PixelCanvas() {
       const halfBrush = Math.floor(brushSize / 2)
       for (let dx = -halfBrush; dx < brushSize - halfBrush; dx++) {
         for (let dy = -halfBrush; dy < brushSize - halfBrush; dy++) {
-          addPixel({ x: coords.x + dx, y: coords.y + dy, color: selectedColor, letter: undefined })
+          if (toolMode === "paint") {
+            addPixel({ x: coords.x + dx, y: coords.y + dy, color: selectedColor, letter: undefined })
+          } else {
+            erasePixelAt(coords.x + dx, coords.y + dy)
+          }
         }
       }
     }
@@ -440,7 +459,7 @@ export function PixelCanvas() {
     <div
       ref={containerRef}
       className={`h-full w-full select-none ${
-        toolMode === "text" ? "cursor-text" : isShiftPressed ? "cursor-move" : "cursor-pointer"
+  toolMode === "text" ? "cursor-text" : isShiftPressed ? "cursor-move" : toolMode === "erase" ? "cursor-crosshair" : "cursor-pointer"
       }`}
       onMouseDown={handleCanvasMouseDown}
       onMouseMove={handleCanvasMouseMove}
@@ -477,7 +496,7 @@ export function PixelCanvas() {
           Pan: ({Math.round(-panX / (GRID_SIZE * zoom))}, {Math.round(-panY / (GRID_SIZE * zoom))})
         </div>
         <div>Pixels: {pixels.length}</div>
-        <div>Mode: {toolMode === "text" ? "Text" : "Paint"}</div>
+  <div>Mode: {toolMode === "text" ? "Text" : toolMode === "erase" ? "Erase" : "Paint"}</div>
         {toolMode === "text" && textInputPosition && (
           <div>
             Cursor: ({textInputPosition.x}, {textInputPosition.y})

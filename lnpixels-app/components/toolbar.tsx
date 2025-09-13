@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { usePixelStore } from "@/hooks/use-pixel-store"
-import { Activity, ZoomIn, ZoomOut, Home, Save, Trash2, Minus, Plus, Paintbrush, Type, HelpCircle } from "lucide-react"
+import { Activity, ZoomIn, ZoomOut, Home, Save, Trash2, Minus, Plus, Paintbrush, Type, HelpCircle, Eraser } from "lucide-react"
 import { useState } from "react"
 import { ColorPicker } from "./color-picker"
 import { ThemeToggle } from "./theme-toggle"
@@ -29,8 +29,9 @@ export function Toolbar({ onToggleActivity, onOpenInfo }: ToolbarProps) {
     getNewPixels,
   } = usePixelStore()
 
-  const newPixels = getNewPixels()
-  const newPixelCount = newPixels.length
+  const newPixelCount = typeof getNewPixels === 'function'
+    ? getNewPixels().length
+    : (Array.isArray(pixels) ? pixels.filter((p: any) => p && (p as any).isNew === true).length : 0)
 
   const [showColorPicker, setShowColorPicker] = useState(false)
 
@@ -53,6 +54,15 @@ export function Toolbar({ onToggleActivity, onOpenInfo }: ToolbarProps) {
               aria-label="Paint tool"
             >
               <Paintbrush className="h-3 w-3" />
+            </Button>
+            <Button
+              size="sm"
+              variant={toolMode === "erase" ? "default" : "ghost"}
+              onClick={() => setToolMode("erase")}
+              className="h-6 w-6 p-0"
+              aria-label="Eraser tool"
+            >
+              <Eraser className="h-3 w-3" />
             </Button>
             <Button
               size="sm"
@@ -82,8 +92,8 @@ export function Toolbar({ onToggleActivity, onOpenInfo }: ToolbarProps) {
             )}
           </div>
 
-          {/* Brush size - only for paint mode */}
-          {toolMode === "paint" && (
+          {/* Brush size - for paint and erase modes */}
+          {(toolMode === "paint" || toolMode === "erase") && (
             <div className="flex items-center gap-1">
               <Button
                 size="sm"
@@ -173,6 +183,15 @@ export function Toolbar({ onToggleActivity, onOpenInfo }: ToolbarProps) {
             </Button>
             <Button
               size="sm"
+              variant={toolMode === "erase" ? "default" : "ghost"}
+              onClick={() => setToolMode("erase")}
+              className="h-5 w-5 p-0"
+              aria-label="Eraser tool"
+            >
+              <Eraser className="h-2 w-2" />
+            </Button>
+            <Button
+              size="sm"
               variant={toolMode === "text" ? "default" : "ghost"}
               onClick={() => setToolMode("text")}
               className="h-5 w-5 p-0"
@@ -199,8 +218,8 @@ export function Toolbar({ onToggleActivity, onOpenInfo }: ToolbarProps) {
             )}
           </div>
 
-          {/* Brush size - only for paint mode */}
-          {toolMode === "paint" && (
+          {/* Brush size - for paint and erase modes */}
+          {(toolMode === "paint" || toolMode === "erase") && (
             <div className="flex flex-col items-center gap-1">
               <Button
                 size="sm"
