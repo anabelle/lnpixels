@@ -24,6 +24,7 @@ export function PixelCanvas() {
   const isComposingRef = useRef(false)
   const [isDrawing, setIsDrawing] = useState(false)
   const [textInputPosition, setTextInputPosition] = useState<{ x: number; y: number } | null>(null)
+  const [hoverPixel, setHoverPixel] = useState<{ x: number; y: number } | null>(null)
   // Touch intent: defer painting briefly to distinguish from pinch/pan
   const paintIntentTimer = useRef<number | null>(null)
   const paintIntentCoords = useRef<{ x: number; y: number } | null>(null)
@@ -173,7 +174,7 @@ export function PixelCanvas() {
         }
       })
 
-      if (toolMode === "text" && textInputPosition) {
+  if (toolMode === "text" && textInputPosition) {
         const screenX = textInputPosition.x * gridSize + panX
         const screenY = textInputPosition.y * gridSize + panY
 
@@ -184,8 +185,34 @@ export function PixelCanvas() {
           ctx.strokeRect(screenX, screenY, gridSize, gridSize)
         }
       }
+
+      // Draw brush/eraser preview circle when hovering
+      if ((toolMode === "paint" || toolMode === "erase") && hoverPixel && !isShiftPressed) {
+        const centerX = hoverPixel.x * gridSize + panX + gridSize / 2
+        const centerY = hoverPixel.y * gridSize + panY + gridSize / 2
+        const radius = (brushSize * gridSize) / 2
+        if (
+          centerX + radius > 0 &&
+          centerY + radius > 0 &&
+          centerX - radius < ctx.canvas.width &&
+          centerY - radius < ctx.canvas.height
+        ) {
+          ctx.save()
+          ctx.beginPath()
+          ctx.arc(centerX, centerY, Math.max(radius - 1, 2), 0, Math.PI * 2)
+          if (toolMode === "erase") {
+            ctx.setLineDash([6, 4])
+            ctx.strokeStyle = "rgba(239, 68, 68, 0.9)" // red-500
+          } else {
+            ctx.strokeStyle = selectedColor
+          }
+          ctx.lineWidth = 2
+          ctx.stroke()
+          ctx.restore()
+        }
+      }
     },
-    [pixels, zoom, panX, panY, toolMode, textInputPosition, selectedColor],
+    [pixels, zoom, panX, panY, toolMode, textInputPosition, selectedColor, hoverPixel, brushSize, isShiftPressed],
   )
 
   const render = useCallback(() => {
@@ -327,6 +354,9 @@ export function PixelCanvas() {
   if (isDrawing && !isShiftPressed && (toolMode === "paint" || toolMode === "erase")) {
       handleCanvasClick(e)
     }
+  // Update hover preview
+  const coords = getPixelCoordinates(e.clientX, e.clientY)
+  if (coords) setHoverPixel(coords)
     handleMouseMove()
   }
 
@@ -464,6 +494,7 @@ export function PixelCanvas() {
       onMouseDown={handleCanvasMouseDown}
       onMouseMove={handleCanvasMouseMove}
       onMouseUp={handleCanvasMouseUp}
+  onMouseLeave={() => setHoverPixel(null)}
       onWheel={handleWheel}
   onTouchStart={handleCanvasTouchStart}
   onTouchMove={handleCanvasTouchMove}
