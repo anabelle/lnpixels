@@ -26,7 +26,7 @@ interface PixelStore {
   zoom: number
   panX: number
   panY: number
-  toolMode: "paint" | "text"
+  toolMode: "paint" | "text" | "erase"
 
   saveModal: SaveModal
 
@@ -41,12 +41,13 @@ interface PixelStore {
   setBrushSize: (size: number) => void
   setZoom: (zoom: number) => void
   setPan: (x: number, y: number) => void
-  setToolMode: (mode: "paint" | "text") => void
+  setToolMode: (mode: "paint" | "text" | "erase") => void
   resetView: () => void
   openSaveModal: () => void
   closeSaveModal: () => void
   updatePixels: (newPixels: Pixel[]) => void
   clearCanvas: () => void
+  erasePixelAt: (x: number, y: number) => void // Restore original at (x,y) or remove new pixel
   fetchPixels: (x1: number, y1: number, x2: number, y2: number) => Promise<void>
   // Progressive/infinite loading helpers
   mergeExistingPixels: (newPixels: Pixel[]) => void
@@ -234,6 +235,29 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
       return { pixels: Array.from(pixelMap.values()) }
     })
   },
+
+  // Selective eraser: for a coordinate, if it's a user-drawn pixel, remove it; if it overwrote a permanent pixel, restore that original.
+  erasePixelAt: (x, y) =>
+    set((state) => {
+      const idx = state.pixels.findIndex((p) => p.x === x && p.y === y)
+      if (idx === -1) return { pixels: state.pixels }
+      const target = state.pixels[idx]
+      // Only operate on user-drawn pixels; do not touch permanent pixels
+      if (!target.isNew) return { pixels: state.pixels }
+
+      const next = state.pixels.slice()
+      // Remove the new pixel at (x,y)
+      next.splice(idx, 1)
+
+      if (target.originalPixel) {
+        // Restore original permanent pixel (clean copy, mark as not new)
+        const { originalPixel, ..._restIgnored } = target
+        const { originalPixel: _nested, ...cleanOriginal } = target.originalPixel
+        next.push({ ...cleanOriginal, isNew: false })
+      }
+
+      return { pixels: next }
+    }),
 
   getNewPixels: () => {
     const { pixels } = get()
