@@ -63,7 +63,7 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
   pixels: [],
   selectedColor: "#000000",
   brushSize: 1,
-   zoom: 0.5, // Reduced default zoom to 50% to avoid graffiti-like appearance
+   zoom: 1.0, // Default zoom to 100% for faster initial pixel loading
   panX: 0,
   panY: 0,
   toolMode: "paint",
@@ -122,7 +122,7 @@ export const usePixelStore = create<PixelStore>((set, get) => ({
   setPan: (x, y) => set({ panX: x, panY: y }),
   setToolMode: (mode) => set({ toolMode: mode }),
 
-   resetView: () => set({ zoom: 0.5, panX: 0, panY: 0 }), // Reset to 50% zoom
+   resetView: () => set({ zoom: 1.0, panX: 0, panY: 0 }), // Reset to 100% zoom for better initial load
 
   setError: (error) => set({ error }),
   setLoading: (loading) => set({ isLoading: loading }),

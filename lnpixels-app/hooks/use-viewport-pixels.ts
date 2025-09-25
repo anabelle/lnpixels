@@ -10,7 +10,7 @@ export function useViewportPixels(containerRef: React.RefObject<HTMLDivElement |
   const { zoom, panX, panY, fetchMorePixels } = usePixelStore()
 
   const GRID_SIZE = 10 // world units per pixel cell
-  const tilePx = 20 // world cells per tile edge
+  const tilePx = 100 // world cells per tile edge
 
   const loadedTiles = useRef<Set<string>>(new Set())
   const inflight = useRef<Set<string>>(new Set())
