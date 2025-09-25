@@ -6,6 +6,24 @@ import { getDatabase } from './database';
 
 const app = express();
 
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    const db = getDatabase();
+    const pixelCount = db.getPixelCount();
+    res.json({
+      status: 'alive',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      pixels: pixelCount,
+      env: process.env.NODE_ENV || 'development'
+    });
+  } catch (error) {
+    console.error('Health check error:', error);
+    res.status(500).json({ status: 'error', message: 'Database unavailable' });
+  }
+});
+
 // CORS middleware
 app.use((req, res, next) => {
   const allowedOrigins = [
