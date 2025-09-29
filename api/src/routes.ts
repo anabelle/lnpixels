@@ -471,27 +471,57 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
 
 
-   // GET /activity - Get recent activity feed
-   router.get('/activity', (req, res) => {
-     const limitParam = req.query.limit as string;
-     let limit = 20; // default limit
+    // GET /activity - Get recent activity feed
+    router.get('/activity', (req, res) => {
+      const limitParam = req.query.limit as string;
+      let limit = 20; // default limit
 
-     if (limitParam) {
-       const parsedLimit = parseInt(limitParam);
-       if (isNaN(parsedLimit) || parsedLimit <= 0) {
-         return res.status(400).json({ error: 'Invalid limit parameter' });
-       }
-       limit = Math.min(parsedLimit, 100); // max 100 items
-     }
+      if (limitParam) {
+        const parsedLimit = parseInt(limitParam);
+        if (isNaN(parsedLimit) || parsedLimit <= 0) {
+          return res.status(400).json({ error: 'Invalid limit parameter' });
+        }
+        limit = Math.min(parsedLimit, 100); // max 100 items
+      }
 
+       try {
+         const activities = database.getRecentActivity(limit);
+         res.json({ events: activities });
+       } catch (error) {
+        console.error('Error fetching activity:', error);
+        res.status(500).json({ error: 'Failed to fetch activity' });
+      }
+    });
+
+    // GET /stats - Get real-time canvas statistics
+    router.get('/stats', (req, res) => {
       try {
-        const activities = database.getRecentActivity(limit);
-        res.json({ events: activities });
+        const pixelCount = database.getPixelCount();
+        const recentActivity = database.getRecentActivity(10); // Last 10 activities for summary
+
+        // Calculate total sats from all pixels
+        const allPixels = database.getAllPixels();
+        const totalSats = allPixels.reduce((sum, pixel) => sum + pixel.sats, 0);
+
+        // Calculate total sats from recent activity
+        const recentSats = recentActivity.reduce((sum, activity) => sum + activity.sats, 0);
+
+        // Get unique buyers (approximate by unique payment hashes)
+        const uniqueBuyers = new Set(recentActivity.map(a => a.payment_hash)).size;
+
+        res.json({
+          totalPixels: pixelCount,
+          totalSats: totalSats,
+          recentActivityCount: recentActivity.length,
+          recentSats: recentSats,
+          uniqueBuyers: uniqueBuyers,
+          lastUpdated: Date.now()
+        });
       } catch (error) {
-       console.error('Error fetching activity:', error);
-       res.status(500).json({ error: 'Failed to fetch activity' });
-     }
-   });
+        console.error('Error fetching stats:', error);
+        res.status(500).json({ error: 'Failed to fetch stats' });
+      }
+    });
 
    // Test endpoint for triggering pixel updates (only in development/test)
    if (process.env.NODE_ENV !== 'production') {

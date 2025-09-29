@@ -33,9 +33,12 @@ app.use((req, res, next) => {
     'http://127.0.0.1:3001',
     'http://localhost:3002',
     'http://127.0.0.1:3002',
+    'http://localhost:3003',
+    'http://127.0.0.1:3003',
     'https://ln.pixel.xx.kg',
-     'https://vm-522.lnvps.cloud',
-     'http://ln.pixel.xx.kg'
+    'https://pixel.xx.kg',
+    'https://vm-522.lnvps.cloud',
+    'http://ln.pixel.xx.kg'
   ];
 
   const origin = req.headers.origin;
