@@ -11,7 +11,7 @@
     "install-all": "pnpm install"
   },
   "devDependencies": {
-    "happy-dom": "^18.0.1"
+    "happy-dom": "^20.0.2"
   },
   "packageManager": "pnpm@9.0.0"
 }
