@@ -39,7 +39,7 @@ export class NakaPayAdapter implements PaymentsAdapter {
         invoice: paymentRequest.invoice,
         payment_hash: paymentRequest.id // Using id as payment_hash for now
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('NakaPay error:', error);
       throw new Error(`Failed to create invoice: ${error.message}`);
     }
@@ -68,8 +68,9 @@ export class NakaPayAdapter implements PaymentsAdapter {
         Buffer.from(expectedSignature, 'hex')
       );
     } catch (error) {
-      console.error('Error verifying webhook signature:', error);
-      return false;
+      console.error('NakaPay error:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create invoice: ${message}`);
     }
   }
 }

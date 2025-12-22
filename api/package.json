@@ -2,10 +2,11 @@
   "name": "api",
   "version": "1.0.0",
   "description": "",
-  "type": "module",
   "main": "index.js",
   "scripts": {
     "dev": "npx tsx src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
     "test": "vitest"
   },
   "keywords": [],
@@ -26,6 +27,7 @@
     "vitest": "^3.2.4"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.3",
     "@types/node": "^24.3.0",
     "socket.io-client": "^4.8.1",
