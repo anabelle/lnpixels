@@ -5,6 +5,7 @@ import { Toolbar } from "@/components/toolbar"
 import { ActivityFeed } from "@/components/activity-feed"
 import { SaveModal } from "@/components/save-modal"
 import { InfoModal } from "@/components/info-modal"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { usePixelStore } from "@/hooks/use-pixel-store"
 import { useWebSocket } from "@/hooks/use-websocket"
 import { useState, useEffect } from "react"
@@ -53,39 +54,65 @@ export default function Home() {
 
       {/* Main Canvas Area */}
       <div className="relative h-full w-full">
-        <PixelCanvas />
+        <ErrorBoundary fallback={({ error }) => (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <p className="text-destructive mb-2">Canvas failed to load</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="text-sm text-primary hover:underline"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+        )}>
+          <PixelCanvas />
+        </ErrorBoundary>
 
         {/* Toolbar */}
         <div className="absolute top-4 left-4 z-10">
-          <Toolbar
-            onToggleActivity={() => setShowActivityFeed(!showActivityFeed)}
-            onOpenInfo={() => setShowInfo(true)}
-          />
+          <ErrorBoundary fallback={() => null}>
+            <Toolbar
+              onToggleActivity={() => setShowActivityFeed(!showActivityFeed)}
+              onOpenInfo={() => setShowInfo(true)}
+            />
+          </ErrorBoundary>
         </div>
 
         {/* Activity Feed */}
         {showActivityFeed && (
           <div className="absolute top-4 right-4 z-10 w-80">
-            <ActivityFeed onClose={() => setShowActivityFeed(false)} />
+            <ErrorBoundary fallback={() => (
+              <div className="bg-background border rounded-lg p-4 text-sm">
+                <p className="text-destructive">Activity feed unavailable</p>
+              </div>
+            )}>
+              <ActivityFeed onClose={() => setShowActivityFeed(false)} />
+            </ErrorBoundary>
           </div>
         )}
 
         {saveModal.isOpen && (
-          <SaveModal
-            isOpen={saveModal.isOpen}
-            onClose={closeSaveModal}
-            totalPixels={saveModal.totalPixels}
-            totalCost={saveModal.totalCost}
-          />
+          <ErrorBoundary fallback={() => null}>
+            <SaveModal
+              isOpen={saveModal.isOpen}
+              onClose={closeSaveModal}
+              totalPixels={saveModal.totalPixels}
+              totalCost={saveModal.totalCost}
+            />
+          </ErrorBoundary>
         )}
 
         {/* Info modal */}
         {showInfo && (
-          <InfoModal
-            isOpen={showInfo}
-            onClose={() => setShowInfo(false)}
-            onGetStarted={() => setShowInfo(false)}
-          />
+          <ErrorBoundary fallback={() => null}>
+            <InfoModal
+              isOpen={showInfo}
+              onClose={() => setShowInfo(false)}
+              onGetStarted={() => setShowInfo(false)}
+            />
+          </ErrorBoundary>
         )}
       </div>
     </div>
