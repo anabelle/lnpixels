@@ -5,6 +5,7 @@ import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { Suspense } from "react"
 
 export const metadata: Metadata = {
@@ -21,11 +22,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <Suspense fallback={<div>Loading...</div>}>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            {children}
-          </ThemeProvider>
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<div>Loading...</div>}>
+            <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+              <ErrorBoundary>
+                {children}
+              </ErrorBoundary>
+            </ThemeProvider>
+          </Suspense>
+        </ErrorBoundary>
         <Analytics />
       </body>
     </html>

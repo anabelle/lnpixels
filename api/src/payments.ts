@@ -12,6 +12,9 @@ export interface PaymentsAdapter {
 
 export class NakaPayAdapter implements PaymentsAdapter {
   private nakaPay: NakaPay;
+  private processedNonces: Set<string> = new Set();
+  private readonly MAX_AGE = 300; // 5 minutes
+  private readonly CLEANUP_INTERVAL = 60000; // 1 minute
 
   constructor() {
     const apiKey = process.env.NAKAPAY_API_KEY;
@@ -21,6 +24,18 @@ export class NakaPayAdapter implements PaymentsAdapter {
     }
     this.nakaPay = new NakaPay(apiKey);
     console.log('NakaPay initialized successfully');
+    
+    // Cleanup old nonces periodically
+    setInterval(() => this.cleanupOldNonces(), this.CLEANUP_INTERVAL);
+  }
+
+  private cleanupOldNonces() {
+    // Nonces are stored with timestamps in a Map for better cleanup
+    // For now, we'll implement a simpler version that just clears occasionally
+    if (this.processedNonces.size > 10000) {
+      this.processedNonces.clear();
+      console.log('Cleared processed nonces due to size limit');
+    }
   }
 
   async createInvoice(amount: number, description: string, metadata?: any) {
@@ -53,6 +68,30 @@ export class NakaPayAdapter implements PaymentsAdapter {
     }
 
     try {
+      // Parse payload for replay protection
+      const payload = JSON.parse(rawBody);
+      
+      // Check timestamp (prevent replay attacks)
+      if (!payload.timestamp) {
+        console.error('Missing timestamp in webhook payload');
+        return false;
+      }
+      
+      const now = Math.floor(Date.now() / 1000);
+      if (now - payload.timestamp > this.MAX_AGE) {
+        console.error(`Webhook timestamp too old: ${payload.timestamp}, current: ${now}`);
+        return false;
+      }
+
+      // Check nonce (prevent duplicate processing)
+      if (payload.nonce) {
+        if (this.processedNonces.has(payload.nonce)) {
+          console.error(`Duplicate nonce detected: ${payload.nonce}`);
+          return false;
+        }
+        this.processedNonces.add(payload.nonce);
+      }
+
       const expectedSignature = crypto
         .createHmac('sha256', secret)
         .update(rawBody)
@@ -68,9 +107,8 @@ export class NakaPayAdapter implements PaymentsAdapter {
         Buffer.from(expectedSignature, 'hex')
       );
     } catch (error) {
-      console.error('NakaPay error:', error);
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to create invoice: ${message}`);
+      console.error('NakaPay webhook verification error:', error);
+      return false;
     }
   }
 }

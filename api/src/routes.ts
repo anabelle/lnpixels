@@ -7,6 +7,49 @@ import { getDatabase, PixelDatabase, Pixel } from './database.js';
 // Track processed payment IDs for idempotency
 const processedPayments = new Set<string>();
 
+// Validation constants
+const MAX_COORDINATE = 10000;
+const MIN_COORDINATE = 0;
+const MAX_COLOR_LENGTH = 7; // #RRGGBB format
+const MAX_LETTER_LENGTH = 1;
+
+// Validation helper functions
+function validateCoordinates(x: number, y: number): boolean {
+  return (
+    typeof x === 'number' && 
+    !isNaN(x) && 
+    Number.isInteger(x) &&
+    typeof y === 'number' && 
+    !isNaN(y) && 
+    Number.isInteger(y) &&
+    x >= MIN_COORDINATE && 
+    x <= MAX_COORDINATE &&
+    y >= MIN_COORDINATE && 
+    y <= MAX_COORDINATE
+  );
+}
+
+function validateColor(color: string): boolean {
+  if (typeof color !== 'string') return false;
+  // Validate hex color format (#RRGGBB or #RGB)
+  return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
+}
+
+function validateLetter(letter?: string): boolean {
+  if (letter === undefined || letter === null || letter === '') return true;
+  if (typeof letter !== 'string') return false;
+  return letter.length <= MAX_LETTER_LENGTH && /^[A-Za-z0-9]$/.test(letter);
+}
+
+function validateRectangleCoordinates(x1: number, y1: number, x2: number, y2: number): boolean {
+  return (
+    validateCoordinates(x1, y1) &&
+    validateCoordinates(x2, y2) &&
+    Math.abs(x2 - x1) < 1000 && // Prevent extremely large rectangles
+    Math.abs(y2 - y1) < 1000
+  );
+}
+
 const router = Router();
 
 // Initialize payments adapter
@@ -19,10 +62,73 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
   const MAX_BULK_PIXELS = Number(process.env.MAX_BULK_PIXELS || 1000)
   const MAX_RECT_PIXELS = Number(process.env.MAX_RECT_PIXELS || 1000)
 
+  // Memory cleanup constants
+  const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  const QUOTE_TTL = 10 * 60 * 1000; // 10 minutes for quotes
+  const PAYMENT_TTL = 30 * 60 * 1000; // 30 minutes for payments
+  const MAX_PROCESSED_PAYMENTS = 10000; // Maximum payments to track
+
   // Use provided database or get default instance
   const database = db || getDatabase();
-  // Temporary in-memory quote store to avoid pushing large metadata to the payment provider
+  
+  // Enhanced in-memory stores with timestamps for cleanup
   const bulkQuotes = new Map<string, { pixelUpdates: any[]; totalPrice: number; totalPixels: number; createdAt: number }>()
+  const processedPaymentsWithTimestamp = new Map<string, number>() // paymentId -> timestamp
+  
+  // Memory cleanup function
+  const cleanupOldEntries = () => {
+    const now = Date.now();
+    let cleanedQuotes = 0;
+    let cleanedPayments = 0;
+    
+    // Clean old quotes
+    for (const [quoteId, quote] of bulkQuotes.entries()) {
+      if (now - quote.createdAt > QUOTE_TTL) {
+        bulkQuotes.delete(quoteId);
+        cleanedQuotes++;
+      }
+    }
+    
+    // Clean old payments
+    for (const [paymentId, timestamp] of processedPaymentsWithTimestamp.entries()) {
+      if (now - timestamp > PAYMENT_TTL) {
+        processedPaymentsWithTimestamp.delete(paymentId);
+        processedPayments.delete(paymentId);
+        cleanedPayments++;
+      }
+    }
+    
+    // Prevent excessive memory usage
+    if (processedPayments.size > MAX_PROCESSED_PAYMENTS) {
+      const oldestPayments = Array.from(processedPaymentsWithTimestamp.entries())
+        .sort(([, a], [, b]) => a - b)
+        .slice(0, Math.floor(MAX_PROCESSED_PAYMENTS * 0.2)); // Remove oldest 20%
+      
+      for (const [paymentId] of oldestPayments) {
+        processedPayments.delete(paymentId);
+        processedPaymentsWithTimestamp.delete(paymentId);
+        cleanedPayments++;
+      }
+    }
+    
+    if (cleanedQuotes > 0 || cleanedPayments > 0) {
+      console.log(`Cleanup: removed ${cleanedQuotes} old quotes, ${cleanedPayments} old payments`);
+      console.log(`Current counts: quotes=${bulkQuotes.size}, payments=${processedPayments.size}`);
+    }
+  };
+  
+  // Setup cleanup interval
+  const cleanupInterval = setInterval(cleanupOldEntries, CLEANUP_INTERVAL);
+  
+  // Cleanup on server shutdown
+  const cleanupOnShutdown = () => {
+    clearInterval(cleanupInterval);
+    console.log('Memory cleanup interval stopped');
+  };
+  process.on('SIGINT', cleanupOnShutdown);
+  process.on('SIGTERM', cleanupOnShutdown);
+  
+  console.log('Memory cleanup system initialized');
   // API info endpoint (mounted at /api/)
   router.get('/', (req, res) => res.json({
     name: 'LNPixels API',
@@ -63,8 +169,13 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
      const x2Num = parseInt(x2 as string);
      const y2Num = parseInt(y2 as string);
 
-     if (isNaN(x1Num) || isNaN(y1Num) || isNaN(x2Num) || isNaN(y2Num)) {
-       return res.status(400).json({ error: 'Invalid rectangle coordinates' });
+     if (isNaN(x1Num) || isNaN(y1Num) || isNaN(x2Num) || isNaN(y2Num) ||
+         !validateRectangleCoordinates(x1Num, y1Num, x2Num, y2Num)) {
+       return res.status(400).json({ 
+         error: 'Invalid rectangle coordinates',
+         details: `Coordinates must be integers between ${MIN_COORDINATE} and ${MAX_COORDINATE}`,
+         received: { x1, y1, x2, y2 }
+       });
      }
 
      try {
@@ -82,13 +193,33 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
     try {
       const { x, y, color, letter } = req.body;
 
-       // Validate input
-       if (typeof x !== 'number' || typeof y !== 'number') {
-         return res.status(400).json({ error: 'Invalid coordinates' });
-       }
+// Validate input
+        if (!validateCoordinates(x, y)) {
+          return res.status(400).json({ 
+            error: 'Invalid coordinates',
+            details: `Coordinates must be integers between ${MIN_COORDINATE} and ${MAX_COORDINATE}`,
+            received: { x, y }
+          });
+        }
 
-         // Ensure color is provided (default to black for basic pixels)
-         const pixelColor = color || '#000000';
+        // Validate color
+        const pixelColor = color || '#000000';
+        if (!validateColor(pixelColor)) {
+          return res.status(400).json({ 
+            error: 'Invalid color',
+            details: 'Color must be in hex format (#RRGGBB or #RGB)',
+            received: { color: pixelColor }
+          });
+        }
+
+        // Validate letter if provided
+        if (!validateLetter(letter)) {
+          return res.status(400).json({ 
+            error: 'Invalid letter',
+            details: 'Letter must be a single alphanumeric character or empty',
+            received: { letter }
+          });
+        }
 
        // Find existing pixel to get last price
        const existingPixel = database.getPixel(x, y);
@@ -122,10 +253,14 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
     try {
       const { x1, y1, x2, y2, color, letters } = req.body;
 
-      // Validate rectangle coordinates
-      if ([x1, y1, x2, y2].some(coord => typeof coord !== 'number')) {
-        return res.status(400).json({ error: 'Invalid rectangle coordinates' });
-      }
+// Validate rectangle coordinates
+       if (!validateRectangleCoordinates(x1, y1, x2, y2)) {
+         return res.status(400).json({ 
+           error: 'Invalid rectangle coordinates',
+           details: `Coordinates must be integers between ${MIN_COORDINATE} and ${MAX_COORDINATE}`,
+           received: { x1, y1, x2, y2 }
+         });
+       }
 
        const width = Math.abs(x2 - x1) + 1;
        const height = Math.abs(y2 - y1) + 1;
@@ -136,13 +271,35 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
          return res.status(413).json({ error: { code: 'PAYLOAD_TOO_LARGE', message: `Rectangle size exceeds maximum of ${MAX_RECT_PIXELS} pixels` } });
        }
 
-        // Validate letters length
-        if (letters && letters.length > totalPixels) {
-          return res.status(400).json({ error: 'Too many letters for rectangle size' });
-        }
+// Validate letters length and format
+         if (letters) {
+           if (!Array.isArray(letters)) {
+             return res.status(400).json({ error: 'Letters must be an array' });
+           }
+           if (letters.length > totalPixels) {
+             return res.status(400).json({ error: 'Too many letters for rectangle size' });
+           }
+           // Validate each letter
+           for (const letter of letters) {
+             if (!validateLetter(letter)) {
+               return res.status(400).json({ 
+                 error: 'Invalid letter in array',
+                 details: 'Each letter must be a single alphanumeric character or empty',
+                 received: { letter }
+               });
+             }
+           }
+         }
 
-        // Ensure color is provided (default to black for basic pixels)
-        const pixelColor = color || '#000000';
+         // Validate color
+         const pixelColor = color || '#000000';
+         if (!validateColor(pixelColor)) {
+           return res.status(400).json({ 
+             error: 'Invalid color',
+             details: 'Color must be in hex format (#RRGGBB or #RGB)',
+             received: { color: pixelColor }
+           });
+         }
 
       // Calculate total price
       let totalPrice = 0;
@@ -217,18 +374,30 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         return res.status(413).json({ error: { code: 'PAYLOAD_TOO_LARGE', message: `Pixel count exceeds maximum of ${MAX_BULK_PIXELS} pixels` } });
       }
 
-      // Validate each pixel
-      for (const pixel of pixels) {
-        if (typeof pixel.x !== 'number' || typeof pixel.y !== 'number') {
-          return res.status(400).json({ error: 'Invalid pixel coordinates - x and y must be numbers' });
-        }
-        if (typeof pixel.color !== 'string') {
-          return res.status(400).json({ error: 'Invalid pixel color - must be string' });
-        }
-        if (pixel.letter && typeof pixel.letter !== 'string') {
-          return res.status(400).json({ error: 'Invalid pixel letter - must be string if provided' });
-        }
-      }
+// Validate each pixel
+       for (const pixel of pixels) {
+         if (!validateCoordinates(pixel.x, pixel.y)) {
+           return res.status(400).json({ 
+             error: 'Invalid pixel coordinates',
+             details: `Coordinates must be integers between ${MIN_COORDINATE} and ${MAX_COORDINATE}`,
+             received: { x: pixel.x, y: pixel.y }
+           });
+         }
+         if (!validateColor(pixel.color)) {
+           return res.status(400).json({ 
+             error: 'Invalid pixel color',
+             details: 'Color must be in hex format (#RRGGBB or #RGB)',
+             received: { color: pixel.color }
+           });
+         }
+         if (!validateLetter(pixel.letter)) {
+           return res.status(400).json({ 
+             error: 'Invalid pixel letter',
+             details: 'Letter must be a single alphanumeric character or empty',
+             received: { letter: pixel.letter }
+           });
+         }
+       }
 
       // Calculate total price and prepare pixel updates
       let totalPrice = 0;
@@ -285,17 +454,12 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         return res.status(400).json({ error: 'Missing raw body' });
       }
 
-      // Verify webhook signature
-      if (!paymentsAdapter.verifyWebhook(rawBody, signature)) {
-        return res.status(401).json({ error: 'Invalid signature' });
-      }
+// Verify webhook signature (includes replay protection)
+       if (!paymentsAdapter.verifyWebhook(rawBody, signature)) {
+         return res.status(401).json({ error: 'Invalid signature or potential replay attack' });
+       }
 
-      const payload = JSON.parse(rawBody);
-
-      // Verify webhook signature
-      if (!paymentsAdapter.verifyWebhook(rawBody, signature)) {
-        return res.status(401).json({ error: 'Invalid signature' });
-      }
+       const payload = JSON.parse(rawBody);
 
       // Handle payment completion
       if (payload.event === 'payment.completed') {
@@ -460,6 +624,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
         // Mark payment as processed for idempotency
         processedPayments.add(paymentId);
+        processedPaymentsWithTimestamp.set(paymentId, Date.now());
       }
 
       res.json({ success: true });
@@ -638,11 +803,12 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
              metadata: { quoteId, type: 'pixel_set' }
            });
 
-           // Mark payment as processed
-           processedPayments.add(paymentId);
+// Mark payment as processed
+            processedPayments.add(paymentId);
+            processedPaymentsWithTimestamp.set(paymentId, Date.now());
 
-           // Consume the quote to mimic real flow
-           bulkQuotes.delete(quoteId)
+            // Consume the quote to mimic real flow
+            bulkQuotes.delete(quoteId)
 
            return res.json({ success: true, pixelsUpdated: savedPixels.length, paymentId, usedQuote: true });
          } else if (pixelUpdates && Array.isArray(pixelUpdates)) {
@@ -696,10 +862,11 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
              metadata: { pixelUpdates, type: 'pixel_set' }
            });
 
-           // Mark payment as processed
-           processedPayments.add(paymentId);
+// Mark payment as processed
+            processedPayments.add(paymentId);
+            processedPaymentsWithTimestamp.set(paymentId, Date.now());
 
-           res.json({ success: true, pixelsUpdated: savedPixels.length, paymentId });
+            res.json({ success: true, pixelsUpdated: savedPixels.length, paymentId });
          } else {
            res.status(400).json({ error: 'pixelUpdates array is required for test payment' });
          }
