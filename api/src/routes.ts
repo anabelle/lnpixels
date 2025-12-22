@@ -16,8 +16,8 @@ const paymentsAdapter: PaymentsAdapter = process.env.NAKAPAY_API_KEY
 
 export function setupRoutes(io: Namespace, db?: PixelDatabase) {
   // Configurable limits (raise via env)
-  const MAX_BULK_PIXELS = Number(process.env.MAX_BULK_PIXELS || 2000)
-  const MAX_RECT_PIXELS = Number(process.env.MAX_RECT_PIXELS || 2000)
+  const MAX_BULK_PIXELS = Number(process.env.MAX_BULK_PIXELS || 1000)
+  const MAX_RECT_PIXELS = Number(process.env.MAX_RECT_PIXELS || 1000)
 
   // Use provided database or get default instance
   const database = db || getDatabase();

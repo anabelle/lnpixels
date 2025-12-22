@@ -3,14 +3,12 @@ import request from 'supertest';
 import express from 'express';
 import crypto from 'crypto';
 import { setupRoutes } from '../src/routes.js';
-import { Server as SocketServer } from 'socket.io';
+import { setupSocket } from '../src/socket.js';
 import { Server } from 'http';
 import { createTestDatabase } from '../src/database.js';
 
 describe('Letter Webhook Integration', () => {
   let app: express.Application;
-  let server: Server;
-  let io: SocketServer;
   let db: any;
 
   beforeEach(() => {
@@ -28,20 +26,14 @@ describe('Letter Webhook Integration', () => {
       }
     }));
 
-    // Setup Socket.IO
-    const httpServer = new Server(app);
-    io = new SocketServer(httpServer);
-    server = httpServer;
+    // Setup Socket.IO using common setupSocket helper
+    const { io } = setupSocket(app);
 
     // Setup routes with test database
     app.use('/api', setupRoutes(io, db));
   });
 
-  afterEach((done) => {
-    if (server) {
-      server.close(done);
-    }
-  });
+  // No afterEach needed as server.listen() is not called; supertest handles ephemeral server
 
   it('should save pixel with letter via webhook', async () => {
     const payload = {
