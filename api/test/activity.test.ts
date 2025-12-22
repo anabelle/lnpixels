@@ -114,15 +114,16 @@ describe('GET /api/activity', () => {
   });
 
   it('should return recent activities with default limit', async () => {
-    // Insert some test activities
+    // Insert some test activities with distinct timestamps to ensure ordering
+    const now = Date.now();
     db.insertActivity({
       x: 10, y: 20, color: '#ff0000', letter: 'A', sats: 100,
-      payment_hash: 'hash1', created_at: Date.now(), type: 'single_purchase'
+      payment_hash: 'hash1', created_at: now, type: 'single_purchase'
     });
 
     db.insertActivity({
       x: 5, y: 15, color: '#00ff00', letter: null, sats: 10,
-      payment_hash: 'hash2', created_at: Date.now(), type: 'single_purchase'
+      payment_hash: 'hash2', created_at: now - 1000, type: 'single_purchase'
     });
 
     // Verify activities were inserted
