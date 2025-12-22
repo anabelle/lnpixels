@@ -8,24 +8,18 @@ import { getDatabase, PixelDatabase, Pixel } from './database.js';
 const processedPayments = new Set<string>();
 
 // Validation constants
-const MAX_COORDINATE = 10000;
-const MIN_COORDINATE = 0;
 const MAX_COLOR_LENGTH = 7; // #RRGGBB format
 const MAX_LETTER_LENGTH = 1;
 
 // Validation helper functions
 function validateCoordinates(x: number, y: number): boolean {
   return (
-    typeof x === 'number' && 
-    !isNaN(x) && 
+    typeof x === 'number' &&
+    !isNaN(x) &&
     Number.isInteger(x) &&
-    typeof y === 'number' && 
-    !isNaN(y) && 
-    Number.isInteger(y) &&
-    x >= MIN_COORDINATE && 
-    x <= MAX_COORDINATE &&
-    y >= MIN_COORDINATE && 
-    y <= MAX_COORDINATE
+    typeof y === 'number' &&
+    !isNaN(y) &&
+    Number.isInteger(y)
   );
 }
 
@@ -171,11 +165,11 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
      if (isNaN(x1Num) || isNaN(y1Num) || isNaN(x2Num) || isNaN(y2Num) ||
          !validateRectangleCoordinates(x1Num, y1Num, x2Num, y2Num)) {
-       return res.status(400).json({ 
-         error: 'Invalid rectangle coordinates',
-         details: `Coordinates must be integers between ${MIN_COORDINATE} and ${MAX_COORDINATE}`,
-         received: { x1, y1, x2, y2 }
-       });
+        return res.status(400).json({
+          error: 'Invalid rectangle coordinates',
+          details: 'Coordinates must be integers',
+          received: { x1, y1, x2, y2 }
+        });
      }
 
      try {
@@ -195,9 +189,9 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
 // Validate input
         if (!validateCoordinates(x, y)) {
-          return res.status(400).json({ 
+          return res.status(400).json({
             error: 'Invalid coordinates',
-            details: `Coordinates must be integers between ${MIN_COORDINATE} and ${MAX_COORDINATE}`,
+            details: 'Coordinates must be integers',
             received: { x, y }
           });
         }
@@ -255,11 +249,11 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
 // Validate rectangle coordinates
        if (!validateRectangleCoordinates(x1, y1, x2, y2)) {
-         return res.status(400).json({ 
-           error: 'Invalid rectangle coordinates',
-           details: `Coordinates must be integers between ${MIN_COORDINATE} and ${MAX_COORDINATE}`,
-           received: { x1, y1, x2, y2 }
-         });
+          return res.status(400).json({
+            error: 'Invalid rectangle coordinates',
+            details: 'Coordinates must be integers',
+            received: { x1, y1, x2, y2 }
+          });
        }
 
        const width = Math.abs(x2 - x1) + 1;
@@ -377,11 +371,11 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 // Validate each pixel
        for (const pixel of pixels) {
          if (!validateCoordinates(pixel.x, pixel.y)) {
-           return res.status(400).json({ 
-             error: 'Invalid pixel coordinates',
-             details: `Coordinates must be integers between ${MIN_COORDINATE} and ${MAX_COORDINATE}`,
-             received: { x: pixel.x, y: pixel.y }
-           });
+            return res.status(400).json({
+              error: 'Invalid pixel coordinates',
+              details: 'Coordinates must be integers',
+              received: { x: pixel.x, y: pixel.y }
+            });
          }
          if (!validateColor(pixel.color)) {
            return res.status(400).json({ 
