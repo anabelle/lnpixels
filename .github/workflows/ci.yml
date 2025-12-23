@@ -24,8 +24,14 @@ jobs:
       - name: Setup pnpm
         run: npm install -g pnpm@9
       
-      - name: Install Dependencies
+      - name: Install Root Dependencies
         run: pnpm install
+      
+      - name: Install API Dependencies
+        run: cd api && npm install
+      
+      - name: Install App Dependencies
+        run: cd lnpixels-app && npm install
       
       - name: Build
         run: pnpm run build || echo "Build failed"
