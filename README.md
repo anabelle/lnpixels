@@ -372,9 +372,9 @@ curl -X POST "https://ln.pixel.xx.kg/api/invoices/bulk" \
 ```
 
 ### Payment Webhook
-Handle payment confirmations from Lightning Network.
+Handle payment confirmations from NakaPay Lightning Network.
 
-**Endpoint:** `POST /api/payments/webhook`
+**Endpoint:** `POST /api/nakapay`
 
 **Headers:**
 - `X-Nakapay-Signature`: Webhook signature for verification
@@ -383,18 +383,17 @@ Handle payment confirmations from Lightning Network.
 **Request Body:**
 ```json
 {
-  "payment_hash": "a1b2c3d4...",
+  "payment_id": "a1b2c3d4...",
   "amount": 10,
-  "status": "completed",
-  "timestamp": 1640995200
+  "event": "payment.completed",
+  "metadata": { "x": 100, "y": 50, "color": "#FF5733" }
 }
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "status": "processed",
-  "pixels_updated": 1
+  "success": true
 }
 ```
 
@@ -491,16 +490,22 @@ The API also provides real-time updates via WebSocket for live canvas synchroniz
 ```javascript
 const socket = io('https://ln.pixel.xx.kg');
 
-// Listen for pixel updates
-socket.on('pixelUpdate', (data) => {
+// Listen for pixel updates (single and bulk)
+socket.on('pixel.update', (data) => {
   console.log('Pixel updated:', data);
-  // data: { x: 100, y: 50, color: '#FF5733', type: 'color' }
+  // data: { x: 100, y: 50, color: '#FF5733', letter: 'A', sats: 100, created_at: ... }
 });
 
-// Listen for bulk updates
-socket.on('bulkUpdate', (data) => {
-  console.log('Bulk pixels updated:', data);
-  // data: { pixels: [...], payment_hash: '...' }
+// Listen for activity summaries (bulk purchases)
+socket.on('activity.append', (data) => {
+  console.log('Activity appended:', data);
+  // data: { x, y, summary: "N pixels purchased", type: 'bulk_purchase', pixelCount: N, totalSats: ... }
+});
+
+// Listen for payment confirmations
+socket.on('payment.confirmed', (data) => {
+  console.log('Payment confirmed:', data);
+  // data: { paymentId: '...', amount: N, timestamp: ..., metadata: { ... } }
 });
 ```
 
@@ -551,7 +556,7 @@ X-RateLimit-Reset: 1640995260
 ### Main Components
 - **Canvas**: Interactive pixel art canvas with pan/zoom
 - **PurchasePanel**: Pixel selection and pricing interface
-- **PaymentModal**: Professional payment interface with QR codes
+- **PaymentModal**: Professional payment interface with QR codes (SaveModal handles bulk purchase summary)
 - **ActivityFeed**: Real-time activity updates
 - **ColorPicker**: Advanced color selection with presets
 - **MobileTabs**: Mobile-responsive navigation
