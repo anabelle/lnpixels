@@ -166,39 +166,34 @@ cd lnpixels-app && pnpm run test:coverage
 
 ## 🚀 Deployment
 
-### Development Deployment
+### Option 1: Docker (Recommended)
 
-The project includes PM2 configuration for easy deployment:
+The easiest way to deploy LNPixels is using the Docker configuration in the root repository.
 
 ```bash
-# Install PM2 globally
-npm install -g pm2
+# From the root of the pixel repository
+docker compose up -d --build
+```
 
+This will start:
+- **API**: http://localhost:3000
+- **App**: http://localhost:3002
+
+### Option 2: PM2 (Legacy)
+
+The project still includes PM2 configuration for traditional deployment:
+
+```bash
 # Start applications with PM2
 pm2 start ecosystem.config.example.js
 
-# Save PM2 configuration for auto-restart
-pm2 save
-
-# View application status
+# View status
 pm2 status
-
-# View logs
-pm2 logs
 ```
 
 ### Production Deployment
 
-1. **Build the applications**
-   ```bash
-   pnpm run build
-   ```
-
-2. **Configure nginx** (see nginx configuration in ecosystem.config.example.js)
-
-3. **Set up SSL** (using Let's Encrypt/Certbot)
-
-4. **Configure domain** and DNS
+In production, it is recommended to use the Docker setup managed by the root repository's CI/CD pipeline. See the root `DEPLOYMENT.md` for details.
 
 ## 🔧 Configuration
 
