@@ -8,6 +8,7 @@
     "dev:all": "pnpm --parallel --filter \"api\" --filter \"lnpixels-app\" dev",
     "build": "pnpm --filter api build && pnpm --filter lnpixels-app build",
     "test": "pnpm --filter api test && pnpm --filter lnpixels-app test",
+    "dev": "pnpm run dev:all",
     "install-all": "pnpm install"
   },
   "devDependencies": {
