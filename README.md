@@ -33,7 +33,7 @@ A collaborative pixel art platform built with Lightning Network payments. Create
 ### Backend (API)
 - **Framework**: Node.js + Express + TypeScript
 - **Real-time**: Socket.IO for WebSocket connections
-- **Database**: SQLite with better-sqlite3
+- **Database**: SQLite with better-sqlite3 (requires entire folder mount for WAL support in Docker)
 - **Payments**: Lightning Network integration via Nakapay
 - **Development**: Hot reload with tsx
 
