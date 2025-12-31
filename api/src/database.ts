@@ -66,11 +66,11 @@ export class PixelDatabase {
   private db: Database.Database;
   private dbPath: string;
 
-  constructor(dbPath: string = './pixels.db') {
-    this.dbPath = dbPath;
+  constructor(dbPath?: string) {
+    this.dbPath = dbPath || process.env.DB_PATH || './pixels.db';
 
     // Ensure the directory exists
-    const dbDir = path.dirname(dbPath);
+    const dbDir = path.dirname(this.dbPath);
     if (dbDir !== '.') {
       // For now, we'll use the current directory
       // In production, you might want to create the directory if it doesn't exist
@@ -224,12 +224,12 @@ export class PixelDatabase {
   createBackup(backupPath?: string): string {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupDir = process.env.BACKUP_DIR || '../backups';
-    
+
     // Ensure backup directory exists
     if (!fs.existsSync(backupDir)) {
       fs.mkdirSync(backupDir, { recursive: true });
     }
-    
+
     // Generate secure backup name with random suffix
     const randomSuffix = Math.random().toString(36).slice(2, 8);
     const defaultPath = path.join(backupDir, `pixels_backup_${timestamp}_${randomSuffix}.db`);
@@ -238,7 +238,7 @@ export class PixelDatabase {
     // For SQLite, we can use the backup API or just copy the file
     // Since better-sqlite3 doesn't have built-in backup, we'll use filesystem copy
     fs.copyFileSync(this.dbPath, finalPath);
-    
+
     // Set secure permissions (read/write for owner only)
     try {
       fs.chmodSync(finalPath, 0o600);
