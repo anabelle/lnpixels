@@ -81,8 +81,9 @@ export class PixelDatabase {
   }
 
   private initialize() {
+    console.log('Opening database at:', this.dbPath);
     // Enable WAL mode for better performance
-    this.db.pragma('journal_mode = WAL');
+    // this.db.pragma('journal_mode = WAL');
 
     // Create tables
     this.db.exec(CREATE_PIXELS_TABLE);

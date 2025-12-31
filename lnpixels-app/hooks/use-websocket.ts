@@ -10,7 +10,8 @@ export function useWebSocket() {
 
   useEffect(() => {
     // Connect to the WebSocket server
-    const socket = io("https://ln.pixel.xx.kg/api", {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || "https://ln.pixel.xx.kg/api"
+    const socket = io(apiBase, {
       transports: ["websocket", "polling"],
     })
 
