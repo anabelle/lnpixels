@@ -11,6 +11,7 @@ import {
   MAX_COLOR_LENGTH,
   MAX_LETTER_LENGTH
 } from './middleware/validation.js';
+import { setupStatsRoutes } from './routes/stats.routes.js';
 
 // Track processed payment IDs for idempotency
 const processedPayments = new Set<string>();
@@ -623,35 +624,8 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
     }
   });
 
-  // GET /stats - Get real-time canvas statistics
-  router.get('/stats', (req, res) => {
-    try {
-      const pixelCount = database.getPixelCount();
-      const recentActivity = database.getRecentActivity(10); // Last 10 activities for summary
-
-      // Calculate total sats from all pixels
-      const allPixels = database.getAllPixels();
-      const totalSats = allPixels.reduce((sum, pixel) => sum + pixel.sats, 0);
-
-      // Calculate total sats from recent activity
-      const recentSats = recentActivity.reduce((sum, activity) => sum + activity.sats, 0);
-
-      // Get unique buyers (approximate by unique payment hashes)
-      const uniqueBuyers = new Set(recentActivity.map(a => a.payment_hash)).size;
-
-      res.json({
-        totalPixels: pixelCount,
-        totalSats: totalSats,
-        recentActivityCount: recentActivity.length,
-        recentSats: recentSats,
-        uniqueBuyers: uniqueBuyers,
-        lastUpdated: Date.now()
-      });
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-      res.status(500).json({ error: 'Failed to fetch stats' });
-    }
-  });
+  // Use stats routes
+  router.use(setupStatsRoutes(database));
 
   // Admin restore endpoint
   router.post('/admin/restore', async (req, res) => {
