@@ -76,7 +76,7 @@ export class PixelDatabase {
       // In production, you might want to create the directory if it doesn't exist
     }
 
-    this.db = new Database(dbPath);
+    this.db = new Database(this.dbPath);
     this.initialize();
   }
 
