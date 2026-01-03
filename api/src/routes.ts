@@ -3,46 +3,17 @@ import { Namespace } from 'socket.io';
 import { PaymentsAdapter, NakaPayAdapter, MockPaymentsAdapter } from './payments.js';
 import { price } from './pricing.js';
 import { getDatabase, PixelDatabase, Pixel } from './database.js';
+import {
+  validateCoordinates,
+  validateColor,
+  validateLetter,
+  validateRectangleCoordinates,
+  MAX_COLOR_LENGTH,
+  MAX_LETTER_LENGTH
+} from './middleware/validation.js';
 
 // Track processed payment IDs for idempotency
 const processedPayments = new Set<string>();
-
-// Validation constants
-const MAX_COLOR_LENGTH = 7; // #RRGGBB format
-const MAX_LETTER_LENGTH = 1;
-
-// Validation helper functions
-function validateCoordinates(x: number, y: number): boolean {
-  return (
-    typeof x === 'number' &&
-    !isNaN(x) &&
-    Number.isInteger(x) &&
-    typeof y === 'number' &&
-    !isNaN(y) &&
-    Number.isInteger(y)
-  );
-}
-
-function validateColor(color: string): boolean {
-  if (typeof color !== 'string') return false;
-  // Validate hex color format (#RRGGBB or #RGB)
-  return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
-}
-
-function validateLetter(letter?: string): boolean {
-  if (letter === undefined || letter === null || letter === '') return true;
-  if (typeof letter !== 'string') return false;
-  return letter.length <= MAX_LETTER_LENGTH && /^[A-Za-z0-9]$/.test(letter);
-}
-
-function validateRectangleCoordinates(x1: number, y1: number, x2: number, y2: number): boolean {
-  return (
-    validateCoordinates(x1, y1) &&
-    validateCoordinates(x2, y2) &&
-    Math.abs(x2 - x1) < 1000 && // Prevent extremely large rectangles
-    Math.abs(y2 - y1) < 1000
-  );
-}
 
 const router = Router();
 
