@@ -105,10 +105,10 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
       basePrice = 100
       pixelType = "Letter"
     } else if (pixel.color === "#000000") {
-      basePrice = 1
-      pixelType = "Black"
+      basePrice = 21
+      pixelType = "Basic"
     } else {
-      basePrice = 10
+      basePrice = 42
       pixelType = "Color"
     }
 
@@ -173,7 +173,7 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
     setError(null)
     try {
       console.log('Generating invoice for pixels:', newPixels.length);
-      
+
       // Use the new bulk pixels endpoint
       const requestBody = {
         pixels: newPixels.map(pixel => ({
@@ -184,7 +184,7 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
         }))
       };
       console.log('Request body:', JSON.stringify(requestBody, null, 2));
-      
+
       const response = await fetch('https://ln.pixel.xx.kg/api/invoices/pixels', {
         method: 'POST',
         headers: {
@@ -213,18 +213,18 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
 
       setInvoice(invoiceData.invoice);
       setPaymentId(invoiceData.id);
-  if (invoiceData.quoteId) setQuoteId(invoiceData.quoteId);
-      
+      if (invoiceData.quoteId) setQuoteId(invoiceData.quoteId);
+
       // Store pixel updates for payment simulation with individual pixel prices
       const updates = newPixels.map(pixel => {
         // Calculate individual pixel price (same logic as in openSaveModal)
         let basePrice: number
         if (pixel.letter) {
-          basePrice = 100 // Color + letter = 100 sats
+          basePrice = 100 // Letter = 100 sats
         } else if (pixel.color === "#000000") {
-          basePrice = 1 // Black pixel = 1 sat
+          basePrice = 21 // Basic pixel = 21 sats
         } else {
-          basePrice = 10 // Color pixel = 10 sats
+          basePrice = 42 // Color pixel = 42 sats
         }
 
         // Apply overwrite rule if pixel has purchase history
@@ -244,17 +244,17 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
       });
       setPixelUpdates(updates);
 
-  // Generate QR data for the Lightning invoice
-  const qrCodeData = `lightning:${invoiceData.invoice}`
-  setQrCode(qrCodeData)
+      // Generate QR data for the Lightning invoice
+      const qrCodeData = `lightning:${invoiceData.invoice}`
+      setQrCode(qrCodeData)
 
     } catch (error) {
       console.error("Failed to generate invoice:", error)
       console.error("Error type:", typeof error)
       console.error("Error constructor:", error?.constructor?.name)
-      
+
       let errorMessage = "Failed to generate invoice"
-      
+
       if (error instanceof Error) {
         errorMessage = error.message
         console.log("Using Error.message:", errorMessage)
@@ -284,12 +284,12 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
       } else {
         console.log("Unexpected error type, using fallback")
       }
-      
+
       setError(errorMessage)
       // Fallback to mock invoice if API fails
-  const mockInvoice = `lnbc${totalCost}u1p...mock_invoice_for_${totalPixels}_pixels`
-  setInvoice(mockInvoice)
-  setQrCode(`lightning:${mockInvoice}`)
+      const mockInvoice = `lnbc${totalCost}u1p...mock_invoice_for_${totalPixels}_pixels`
+      setInvoice(mockInvoice)
+      setQrCode(`lightning:${mockInvoice}`)
     } finally {
       setLoading(false)
     }
@@ -363,7 +363,7 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
               </div>
 
               <div className="text-xs text-muted-foreground space-y-1">
-                <div>• Base prices: Black (1 sat), Color (10 sats), Letter (100 sats)</div>
+                <div>• Base prices: Basic (21 sats), Color (42 sats), Letter (100 sats)</div>
                 <div>• Overwrite rule: Pay 2x last sold amount or base price, whichever is higher</div>
               </div>
             </div>
@@ -437,10 +437,10 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
                   <div className="text-xs text-orange-600 mb-2 text-center">
                     Development Mode - Simulate Payment
                   </div>
-                  <Button 
-                    onClick={simulatePayment} 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    onClick={simulatePayment}
+                    variant="outline"
+                    size="sm"
                     className="w-full border-orange-200 text-orange-600 hover:bg-orange-50"
                   >
                     🧪 Simulate Payment (Dev Only)

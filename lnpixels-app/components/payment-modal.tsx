@@ -90,7 +90,7 @@ export function PaymentModal({ isOpen, onClose, pixelData }: PaymentModalProps) 
   if (!pixelData) return null
 
   const calculatePrice = () => {
-    const basePrice = letter ? 100 : 10 // 100 sats for letter, 10 for color only
+    const basePrice = letter ? 100 : 42 // 100 sats for letter, 42 for color only
     return basePrice
   }
 

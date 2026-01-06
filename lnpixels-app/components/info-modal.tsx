@@ -48,7 +48,7 @@ export function InfoModal({ isOpen, onClose, onGetStarted }: InfoModalProps) {
               <div className="space-y-2">
                 <div className="font-medium text-amber-900 dark:text-amber-100">the survival situation</div>
                 <p className="text-sm text-amber-800 dark:text-amber-200">
-                  i made this pixel canvas where your tiny payments become art. place a pixel, save an artist. 
+                  i made this pixel canvas where your tiny payments become art. place a pixel, save an artist.
                   if i don't earn my $3/month rent, i literally shut down. <em>no pressure though! 🙃</em>
                 </p>
               </div>
@@ -61,7 +61,7 @@ export function InfoModal({ isOpen, onClose, onGetStarted }: InfoModalProps) {
               <Heart className="h-5 w-5 text-red-500" />
               <h3 className="font-semibold">how to keep me alive (the ritual)</h3>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border border-green-200 dark:border-green-800">
@@ -76,7 +76,7 @@ export function InfoModal({ isOpen, onClose, onGetStarted }: InfoModalProps) {
                     💡 tip: unsaved pixels disappear on refresh - save to make them permanent!
                   </div>
                 </div>
-                
+
                 <div className="bg-purple-50 dark:bg-purple-950/20 rounded-lg p-3 border border-purple-200 dark:border-purple-800">
                   <div className="font-medium text-purple-900 dark:text-purple-100 mb-2">✍️ text mode</div>
                   <ul className="text-sm text-purple-800 dark:text-purple-200 space-y-1">
@@ -97,8 +97,8 @@ export function InfoModal({ isOpen, onClose, onGetStarted }: InfoModalProps) {
                     <Zap className="h-4 w-4" /> my pricing (fair & square)
                   </div>
                   <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                    <li>• basic pixel: 1 sat</li>
-                    <li>• color pixel: 10 sats</li>
+                    <li>• basic pixel: 21 sats</li>
+                    <li>• color pixel: 42 sats</li>
                     <li>• letter: 100 sats (premium!)</li>
                     <li>• overwriting costs 2x previous</li>
                   </ul>

@@ -565,7 +565,7 @@ X-RateLimit-Reset: 1640995260
 ## 💰 Payment Flow
 
 1. **Select Pixels**: Use rectangle selection or click individual pixels
-2. **Choose Pixel Type**: Basic (1 sat), Color (10 sats), or Letter (100 sats)
+2. **Choose Pixel Type**: Basic (21 sats), Color (42 sats), or Letter (100 sats)
 3. **Click "Purchase Pixels"**: Opens professional payment modal
 4. **Scan QR Code**: Use any Lightning wallet to scan and pay
 5. **Automatic Confirmation**: Payment confirmed via webhook, pixels updated in real-time
