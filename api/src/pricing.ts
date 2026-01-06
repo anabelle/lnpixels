@@ -8,7 +8,7 @@ export interface PricingOptions {
 // Base prices - adjusted to meet NakaPay minimum of 21 sats
 const BASE_PRICES = {
   basic: 21,     // No color, no letter (NakaPay minimum)
-  color: 21,     // Color only (NakaPay minimum)
+  color: 42,     // Color pixel
   letter: 100    // Color + letter
 } as const;
 
