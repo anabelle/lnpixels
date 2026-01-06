@@ -5,10 +5,10 @@ export interface PricingOptions {
   lastPrice: number | null;  // Previous price in sats, or null for new pixel
 }
 
-// Base prices as defined in design.md
+// Base prices - adjusted to meet NakaPay minimum of 21 sats
 const BASE_PRICES = {
-  basic: 1,      // No color, no letter
-  color: 10,     // Color only
+  basic: 21,     // No color, no letter (NakaPay minimum)
+  color: 21,     // Color only (NakaPay minimum)
   letter: 100    // Color + letter
 } as const;
 
