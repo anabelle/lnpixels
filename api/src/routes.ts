@@ -416,16 +416,23 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
       const signature = req.headers['x-nakapay-signature'] as string;
       const rawBody = (req as any).rawBody;
 
+      console.log('[Webhook] Received NakaPay webhook');
+      console.log('[Webhook] Signature present:', !!signature);
+      console.log('[Webhook] Raw body length:', rawBody?.length || 0);
+
       if (!rawBody) {
+        console.error('[Webhook] Missing raw body');
         return res.status(400).json({ error: 'Missing raw body' });
       }
 
       // Verify webhook signature (includes replay protection)
       if (!paymentsAdapter.verifyWebhook(rawBody, signature)) {
+        console.error('[Webhook] Signature verification failed');
         return res.status(401).json({ error: 'Invalid signature or potential replay attack' });
       }
 
       const payload = JSON.parse(rawBody);
+      console.log('[Webhook] Event:', payload.event, 'Payment ID:', payload.payment_id);
 
       // Handle payment completion
       if (payload.event === 'payment.completed') {
@@ -433,13 +440,14 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
         // Check for idempotency
         if (processedPayments.has(paymentId)) {
-          console.log(`Payment ${paymentId} already processed, skipping`);
+          console.log(`[Webhook] Payment ${paymentId} already processed, skipping`);
           return res.json({ success: true, message: 'Already processed' });
         }
 
         const metadata = payload.metadata;
+        console.log('[Webhook] Metadata:', JSON.stringify(metadata));
 
-        if (metadata.quoteId) {
+        if (metadata?.quoteId) {
           // Bulk payment resolved via server-side quote
           const quote = bulkQuotes.get(metadata.quoteId)
           if (!quote) {

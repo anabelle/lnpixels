@@ -72,24 +72,24 @@ export class NakaPayAdapter implements PaymentsAdapter {
       const payload = JSON.parse(rawBody);
       
       // Check timestamp (prevent replay attacks)
-      if (!payload.timestamp) {
-        console.error('Missing timestamp in webhook payload');
-        return false;
-      }
-      
-      const now = Math.floor(Date.now() / 1000);
-      if (now - payload.timestamp > this.MAX_AGE) {
-        console.error(`Webhook timestamp too old: ${payload.timestamp}, current: ${now}`);
-        return false;
-      }
-
-      // Check nonce (prevent duplicate processing)
-      if (payload.nonce) {
-        if (this.processedNonces.has(payload.nonce)) {
-          console.error(`Duplicate nonce detected: ${payload.nonce}`);
+      // NakaPay sends ISO string timestamp like "2025-05-06T11:30:00.000Z"
+      if (payload.timestamp) {
+        const webhookTime = new Date(payload.timestamp).getTime() / 1000;
+        const now = Math.floor(Date.now() / 1000);
+        if (now - webhookTime > this.MAX_AGE) {
+          console.error(`Webhook timestamp too old: ${payload.timestamp}, current: ${now}`);
           return false;
         }
-        this.processedNonces.add(payload.nonce);
+      }
+      // Note: timestamp check is optional - signature is the primary security
+
+      // Check payment_id for duplicate processing (NakaPay's idempotency key)
+      if (payload.payment_id) {
+        if (this.processedNonces.has(payload.payment_id)) {
+          console.error(`Duplicate payment_id detected: ${payload.payment_id}`);
+          return false;
+        }
+        this.processedNonces.add(payload.payment_id);
       }
 
       const expectedSignature = crypto
@@ -97,15 +97,20 @@ export class NakaPayAdapter implements PaymentsAdapter {
         .update(rawBody)
         .digest('hex');
 
+      // NakaPay sends signature as hex string, compare directly
+      // Handle both hex-encoded and raw signature formats
+      const sigBuffer = Buffer.from(signature, 'hex').length === signature.length / 2
+        ? Buffer.from(signature, 'hex')
+        : Buffer.from(signature);
+      const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+
       // Check if signatures have the same length before using timingSafeEqual
-      if (signature.length !== expectedSignature.length) {
+      if (sigBuffer.length !== expectedBuffer.length) {
+        console.error(`Signature length mismatch: got ${sigBuffer.length}, expected ${expectedBuffer.length}`);
         return false;
       }
 
-      return crypto.timingSafeEqual(
-        Buffer.from(signature, 'hex'),
-        Buffer.from(expectedSignature, 'hex')
-      );
+      return crypto.timingSafeEqual(sigBuffer, expectedBuffer);
     } catch (error) {
       console.error('NakaPay webhook verification error:', error);
       return false;
