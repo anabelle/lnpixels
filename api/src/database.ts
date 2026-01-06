@@ -67,13 +67,14 @@ export class PixelDatabase {
   private dbPath: string;
 
   constructor(dbPath?: string) {
-    this.dbPath = dbPath || process.env.DB_PATH || './pixels.db';
+    // Default to ./data/pixels.db for Docker volume mount compatibility with WAL mode
+    this.dbPath = dbPath || process.env.DB_PATH || './data/pixels.db';
 
     // Ensure the directory exists
     const dbDir = path.dirname(this.dbPath);
-    if (dbDir !== '.') {
-      // For now, we'll use the current directory
-      // In production, you might want to create the directory if it doesn't exist
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+      console.log('Created database directory:', dbDir);
     }
 
     this.db = new Database(this.dbPath);
