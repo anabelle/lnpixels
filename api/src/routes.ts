@@ -847,5 +847,117 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
     });
   }
 
+  // Narrative Correlator Proxy Routes
+  const CORRELATOR_URL = 'http://narrative-correlator:3004';
+
+  router.get('/correlations/health', async (req, res) => {
+    try {
+      const response = await fetch(`${CORRELATOR_URL}/correlations/health`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('[API] Error fetching correlator health:', error);
+      res.status(503).json({ status: 'unhealthy', error: 'Correlator service unavailable' });
+    }
+  });
+
+  router.get('/correlations', async (req, res) => {
+    try {
+      const queryParams = new URLSearchParams(req.query as any).toString();
+      const response = await fetch(`${CORRELATOR_URL}/correlations${queryParams ? `?${queryParams}` : ''}`);
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      console.error('[API] Error fetching correlations:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch correlations' });
+    }
+  });
+
+  router.get('/correlations/:id', async (req, res) => {
+    try {
+      const response = await fetch(`${CORRELATOR_URL}/correlations/${req.params.id}`);
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      console.error('[API] Error fetching correlation:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch correlation' });
+    }
+  });
+
+  router.get('/correlations/tag/:tag', async (req, res) => {
+    try {
+      const queryParams = new URLSearchParams(req.query as any).toString();
+      const response = await fetch(`${CORRELATOR_URL}/correlations/tag/${req.params.tag}${queryParams ? `?${queryParams}` : ''}`);
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      console.error('[API] Error fetching correlations by tag:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch correlations by tag' });
+    }
+  });
+
+  router.get('/correlations/high-strength', async (req, res) => {
+    try {
+      const queryParams = new URLSearchParams(req.query as any).toString();
+      const response = await fetch(`${CORRELATOR_URL}/correlations/high-strength${queryParams ? `?${queryParams}` : ''}`);
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      console.error('[API] Error fetching high-strength correlations:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch high-strength correlations' });
+    }
+  });
+
+  router.get('/correlations/stats', async (req, res) => {
+    try {
+      const response = await fetch(`${CORRELATOR_URL}/correlations/stats`);
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      console.error('[API] Error fetching correlation stats:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch correlation stats' });
+    }
+  });
+
+  router.get('/correlations/tags', async (req, res) => {
+    try {
+      const queryParams = new URLSearchParams(req.query as any).toString();
+      const response = await fetch(`${CORRELATOR_URL}/correlations/tags${queryParams ? `?${queryParams}` : ''}`);
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      console.error('[API] Error fetching correlation tags:', error);
+      res.status(500).json({ success: false, error: 'Failed to fetch correlation tags' });
+    }
+  });
+
+  router.post('/correlations/analyze', async (req, res) => {
+    try {
+      const response = await fetch(`${CORRELATOR_URL}/correlations/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body)
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      console.error('[API] Error analyzing correlations:', error);
+      res.status(500).json({ success: false, error: 'Failed to analyze correlations' });
+    }
+  });
+
+  router.post('/correlations/cron/run', async (req, res) => {
+    try {
+      const response = await fetch(`${CORRELATOR_URL}/correlations/cron/run`, {
+        method: 'POST'
+      });
+      const data = await response.json();
+      res.status(response.status).json(data);
+    } catch (error) {
+      console.error('[API] Error running correlation cron:', error);
+      res.status(500).json({ success: false, error: 'Failed to run correlation cron' });
+    }
+  });
+
   return router;
 }
