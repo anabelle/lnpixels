@@ -82,8 +82,14 @@ export class PixelDatabase {
 
   private initialize() {
     console.log('Opening database at:', this.dbPath);
-    // Enable WAL mode for better performance
-    // this.db.pragma('journal_mode = WAL');
+    
+    // Enable WAL mode for better performance and durability
+    this.db.pragma('journal_mode = WAL');
+    // Set synchronous to FULL for maximum durability (data survives crashes)
+    this.db.pragma('synchronous = FULL');
+    
+    console.log('Database journal mode:', this.db.pragma('journal_mode'));
+    console.log('Database synchronous:', this.db.pragma('synchronous'));
 
     // Create tables
     this.db.exec(CREATE_PIXELS_TABLE);
@@ -91,6 +97,16 @@ export class PixelDatabase {
     this.db.exec(CREATE_INDEXES);
 
     console.log('Database initialized successfully');
+  }
+
+  // Force checkpoint WAL to main database file (call before shutdown)
+  checkpoint() {
+    try {
+      this.db.pragma('wal_checkpoint(TRUNCATE)');
+      console.log('Database checkpoint completed');
+    } catch (error) {
+      console.error('Database checkpoint failed:', error);
+    }
   }
 
   // Get all pixels within a rectangle

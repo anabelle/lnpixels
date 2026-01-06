@@ -85,6 +85,34 @@ try {
   process.exit(1);
 }
 
+// Graceful shutdown handler - checkpoint database before exit
+const gracefulShutdown = (signal: string) => {
+  console.log(`\n${signal} received. Performing graceful shutdown...`);
+  
+  // Checkpoint the database to flush WAL to main file
+  try {
+    db.checkpoint();
+    db.close();
+    console.log('Database closed gracefully');
+  } catch (error) {
+    console.error('Error during database shutdown:', error);
+  }
+  
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+  
+  // Force exit after 10 seconds if graceful shutdown hangs
+  setTimeout(() => {
+    console.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 try {
   server.listen(3000, '0.0.0.0', () => console.log('Server running on port 3000'));
 } catch (error) {
