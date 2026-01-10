@@ -3,6 +3,7 @@ import express from 'express';
 import { setupSocket } from './socket';
 import { setupRoutes } from './routes';
 import { getDatabase } from './database';
+import { narrativeScheduler } from './services/scheduler';
 
 const app = express();
 
@@ -114,7 +115,10 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 try {
-  server.listen(3000, '0.0.0.0', () => console.log('Server running on port 3000'));
+  server.listen(3000, '0.0.0.0', () => {
+    console.log('Server running on port 3000');
+    narrativeScheduler.start();
+  });
 } catch (error) {
   console.error('Error starting server:', error);
   process.exit(1);
