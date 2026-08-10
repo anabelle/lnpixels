@@ -66,7 +66,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
   const database = db || getDatabase();
 
   // Enhanced in-memory stores with timestamps for cleanup
-  const bulkQuotes = new Map<string, { pixelUpdates: any[]; totalPrice: number; totalPixels: number; createdAt: number }>()
+  const bulkQuotes = new Map<string, { pixelUpdates: any[]; totalPrice: number; totalPixels: number; createdAt: number; giftRecipient?: string | null; giftRecipientType?: string | null; giftMessage?: string | null }>()
   const processedPaymentsWithTimestamp = new Map<string, number>() // paymentId -> timestamp
 
   // Memory cleanup function
@@ -356,7 +356,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
   // POST /invoices/pixels - Create bulk invoice for specific set of pixels
   router.post('/invoices/pixels', async (req, res) => {
     try {
-      const { pixels } = req.body;
+      const { pixels, giftRecipient, giftMessage } = req.body;
 
       // Validate pixels array
       if (!Array.isArray(pixels) || pixels.length === 0) {
@@ -393,6 +393,24 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         }
       }
 
+      // Detect gift recipient type
+      let giftRecipientType: string | null = null;
+      let sanitizedGiftRecipient: string | null = null;
+      let sanitizedGiftMessage: string | null = null;
+      if (giftRecipient && typeof giftRecipient === 'string' && giftRecipient.trim()) {
+        sanitizedGiftRecipient = giftRecipient.trim().slice(0, 100);
+        if (sanitizedGiftRecipient.startsWith('npub1')) {
+          giftRecipientType = 'nostr';
+        } else if (sanitizedGiftRecipient.startsWith('@')) {
+          giftRecipientType = 'telegram';
+        } else {
+          giftRecipientType = 'name';
+        }
+        if (giftMessage && typeof giftMessage === 'string') {
+          sanitizedGiftMessage = giftMessage.trim().slice(0, 100);
+        }
+      }
+
       // Calculate total price and prepare pixel updates
       let totalPrice = 0;
       const pixelUpdates: any[] = [];
@@ -412,9 +430,17 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         });
       }
 
-      // Store quote server-side
+      // Store quote server-side (with gift metadata)
       const quoteId = `q_${Date.now()}_${Math.random().toString(36).slice(2)}`
-      bulkQuotes.set(quoteId, { pixelUpdates, totalPrice, totalPixels: pixels.length, createdAt: Date.now() })
+      bulkQuotes.set(quoteId, {
+        pixelUpdates,
+        totalPrice,
+        totalPixels: pixels.length,
+        createdAt: Date.now(),
+        giftRecipient: sanitizedGiftRecipient,
+        giftRecipientType,
+        giftMessage: sanitizedGiftMessage,
+      })
 
       // Create invoice with minimal metadata
       const invoice = await paymentsAdapter.createInvoice(
@@ -477,9 +503,12 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
           const pixelData = quote.pixelUpdates.map((update: any) => ({
             x: update.x,
             y: update.y,
-            color: update.color || '#000000', // Default to black for basic pixels
+            color: update.color || '#000000',
             letter: update.letter,
-            sats: update.price
+            sats: update.price,
+            gift_recipient: quote.giftRecipient || null,
+            gift_recipient_type: quote.giftRecipientType || null,
+            gift_message: quote.giftMessage || null,
           }));
 
           try {
@@ -649,6 +678,28 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
     } catch (error) {
       console.error('Error fetching activity:', error);
       res.status(500).json({ error: 'Failed to fetch activity' });
+    }
+  });
+
+  // GET /placements/gifts - Get recent gifted pixels
+  router.get('/placements/gifts', (req, res) => {
+    const limitParam = req.query.limit as string;
+    let limit = 50;
+
+    if (limitParam) {
+      const parsedLimit = parseInt(limitParam);
+      if (isNaN(parsedLimit) || parsedLimit <= 0) {
+        return res.status(400).json({ error: 'Invalid limit parameter' });
+      }
+      limit = Math.min(parsedLimit, 100);
+    }
+
+    try {
+      const gifts = database.getRecentGifts(limit);
+      res.json({ gifts });
+    } catch (error) {
+      console.error('Error fetching gifts:', error);
+      res.status(500).json({ error: 'Failed to fetch gifts' });
     }
   });
 

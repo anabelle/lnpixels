@@ -47,6 +47,9 @@ export interface Pixel {
   sats: number;
   created_at: number;
   updated_at: number;
+  gift_recipient?: string | null;
+  gift_recipient_type?: string | null;
+  gift_message?: string | null;
 }
 
 export interface Activity {
@@ -90,6 +93,18 @@ export class PixelDatabase {
     this.db.exec(CREATE_ACTIVITY_TABLE);
     this.db.exec(CREATE_INDEXES);
 
+    // Add gift columns (Phase 1 — gift a pixel feature)
+    // SQLite ALTER TABLE ADD COLUMN is idempotent-safe with try/catch
+    const giftColumns = [
+      'ALTER TABLE pixels ADD COLUMN gift_recipient TEXT',
+      'ALTER TABLE pixels ADD COLUMN gift_recipient_type TEXT',
+      'ALTER TABLE pixels ADD COLUMN gift_message TEXT',
+    ];
+    for (const sql of giftColumns) {
+      try { this.db.exec(sql); } catch { /* column already exists */ }
+    }
+    this.db.exec('CREATE INDEX IF NOT EXISTS idx_pixels_gift ON pixels(gift_recipient) WHERE gift_recipient IS NOT NULL;');
+
     console.log('Database initialized successfully');
   }
 
@@ -115,13 +130,16 @@ export class PixelDatabase {
     const now = Date.now();
 
     const stmt = this.db.prepare(`
-      INSERT INTO pixels (x, y, color, letter, sats, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO pixels (x, y, color, letter, sats, created_at, updated_at, gift_recipient, gift_recipient_type, gift_message)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(x, y) DO UPDATE SET
         color = excluded.color,
         letter = excluded.letter,
         sats = excluded.sats,
-        updated_at = excluded.updated_at
+        updated_at = excluded.updated_at,
+        gift_recipient = COALESCE(excluded.gift_recipient, pixels.gift_recipient),
+        gift_recipient_type = COALESCE(excluded.gift_recipient_type, pixels.gift_recipient_type),
+        gift_message = COALESCE(excluded.gift_message, pixels.gift_message)
       RETURNING *
     `);
 
@@ -132,7 +150,10 @@ export class PixelDatabase {
       pixel.letter || null,
       pixel.sats,
       now,
-      now
+      now,
+      pixel.gift_recipient || null,
+      pixel.gift_recipient_type || null,
+      pixel.gift_message || null
     ) as Pixel;
   }
 
@@ -144,13 +165,16 @@ export class PixelDatabase {
     // Use a transaction for bulk operations
     const transaction = this.db.transaction((pixelData: typeof pixels) => {
       const stmt = this.db.prepare(`
-        INSERT INTO pixels (x, y, color, letter, sats, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO pixels (x, y, color, letter, sats, created_at, updated_at, gift_recipient, gift_recipient_type, gift_message)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(x, y) DO UPDATE SET
           color = excluded.color,
           letter = excluded.letter,
           sats = excluded.sats,
-          updated_at = excluded.updated_at
+          updated_at = excluded.updated_at,
+          gift_recipient = COALESCE(excluded.gift_recipient, pixels.gift_recipient),
+          gift_recipient_type = COALESCE(excluded.gift_recipient_type, pixels.gift_recipient_type),
+          gift_message = COALESCE(excluded.gift_message, pixels.gift_message)
         RETURNING *
       `);
 
@@ -162,7 +186,10 @@ export class PixelDatabase {
           pixel.letter || null,
           pixel.sats,
           now,
-          now
+          now,
+          pixel.gift_recipient || null,
+          pixel.gift_recipient_type || null,
+          pixel.gift_message || null
         ) as Pixel;
         results.push(result);
       }
@@ -219,6 +246,17 @@ export class PixelDatabase {
     `);
 
     return stmt.all(limit) as Activity[];
+  }
+
+  // Get recent gifted pixels (for /api/placements/gifts)
+  getRecentGifts(limit: number = 50): Pixel[] {
+    const stmt = this.db.prepare(`
+      SELECT * FROM pixels
+      WHERE gift_recipient IS NOT NULL
+      ORDER BY updated_at DESC
+      LIMIT ?
+    `);
+    return stmt.all(limit) as Pixel[];
   }
 
   // Create database backup

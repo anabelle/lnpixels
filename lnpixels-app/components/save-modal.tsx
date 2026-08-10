@@ -27,6 +27,9 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
   const [pixelUpdates, setPixelUpdates] = useState<any[]>([])
   const [quoteId, setQuoteId] = useState<string>("")
   const [paymentConfirmed, setPaymentConfirmed] = useState(false)
+  const [giftEnabled, setGiftEnabled] = useState(false)
+  const [giftRecipient, setGiftRecipient] = useState("")
+  const [giftMessage, setGiftMessage] = useState("")
   const { pixels, clearCanvas, getNewPixels, markNewPixelsAsExisting } = usePixelStore()
 
   // Check if we're in development mode
@@ -175,7 +178,7 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
       console.log('Generating invoice for pixels:', newPixels.length);
       
       // Use the new bulk pixels endpoint
-      const requestBody = {
+      const requestBody: any = {
         pixels: newPixels.map(pixel => ({
           x: pixel.x,
           y: pixel.y,
@@ -183,6 +186,14 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
           letter: pixel.letter,
         }))
       };
+
+      // Add gift metadata if enabled
+      if (giftEnabled && giftRecipient.trim()) {
+        requestBody.giftRecipient = giftRecipient.trim();
+        if (giftMessage.trim()) {
+          requestBody.giftMessage = giftMessage.trim();
+        }
+      }
       console.log('Request body:', JSON.stringify(requestBody, null, 2));
       
       const response = await fetch('https://ln.pixel.xx.kg/api/invoices/pixels', {
@@ -387,6 +398,42 @@ export function SaveModal({ isOpen, onClose, totalPixels, totalCost }: SaveModal
             <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
               <p className="text-sm text-destructive">{error}</p>
             </div>
+          )}
+
+          {/* Gift Toggle + Inputs */}
+          {!invoice && !paymentConfirmed && newPixels.length > 0 && (
+            <Card className="p-4">
+              <label className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={giftEnabled}
+                  onChange={(e) => setGiftEnabled(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                Gift to someone
+              </label>
+              {giftEnabled && (
+                <div className="mt-3 space-y-2">
+                  <Input
+                    placeholder="npub1... / @handle / name"
+                    value={giftRecipient}
+                    onChange={(e) => setGiftRecipient(e.target.value)}
+                    maxLength={100}
+                    className="text-sm"
+                  />
+                  <Input
+                    placeholder="Optional message (max 100 chars)"
+                    value={giftMessage}
+                    onChange={(e) => setGiftMessage(e.target.value)}
+                    maxLength={100}
+                    className="text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Recipient type auto-detected: {giftRecipient.startsWith("npub1") ? "Nostr" : giftRecipient.startsWith("@") ? "Telegram" : giftRecipient.trim() ? "Name" : "—"}
+                  </p>
+                </div>
+              )}
+            </Card>
           )}
 
           {/* Generate Invoice */}
