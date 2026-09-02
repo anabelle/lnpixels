@@ -11,6 +11,7 @@ let io: any;
 let clientSocket: ClientSocket;
 
 beforeEach(async () => {
+  process.env.ENABLE_TEST_ENDPOINTS = '1'; // test endpoints are gated in production
   app = express();
   const socketSetup = setupSocket(app);
   server = socketSetup.server;
@@ -26,6 +27,7 @@ beforeEach(async () => {
 });
 
   afterEach(async () => {
+    delete process.env.ENABLE_TEST_ENDPOINTS;
     if (clientSocket) clientSocket.disconnect();
     if (server) {
       await new Promise<void>((resolve) => server.close(resolve));

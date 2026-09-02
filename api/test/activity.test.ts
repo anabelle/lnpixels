@@ -217,7 +217,7 @@ describe('GET /api/activity', () => {
       .send({
         x1: 0, y1: 0, x2: 1, y2: 0,
         color: '#00ff00',
-        letters: 'AB'
+        letters: ['A', 'B']
       })
       .expect(200);
 
@@ -234,7 +234,7 @@ describe('GET /api/activity', () => {
         metadata: {
           x1: 0, y1: 0, x2: 1, y2: 0,
           color: '#00ff00',
-          letters: 'AB',
+          letters: ['A', 'B'],
           pixelUpdates: [
             { x: 0, y: 0, color: '#00ff00', letter: 'A', price: 10 },
             { x: 1, y: 0, color: '#00ff00', letter: 'B', price: 10 }

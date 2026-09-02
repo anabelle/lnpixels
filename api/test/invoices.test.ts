@@ -66,7 +66,7 @@ describe('POST /invoices/bulk', () => {
   it('should create a bulk invoice for rectangle', async () => {
     const response = await request(app)
       .post('/invoices/bulk')
-      .send({ x1: 0, y1: 0, x2: 1, y2: 1, color: '#ff0000', letters: 'AB' })
+      .send({ x1: 0, y1: 0, x2: 1, y2: 1, color: '#ff0000', letters: ['A', 'B'] })
       .expect(200);
 
     expect(response.body).toHaveProperty('invoice');

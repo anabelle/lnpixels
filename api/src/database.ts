@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import type { PendingInvoiceRecord, PendingInvoiceStore } from './payments.js';
 
 // Database schema
 const CREATE_PIXELS_TABLE = `
@@ -38,6 +39,30 @@ const CREATE_INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_activity_created_at ON activity(created_at DESC);
 `;
 
+// Payment-state persistence (fix 4): pending invoices, processed payments, bulk quotes
+const CREATE_PAYMENT_STATE_TABLES = `
+  CREATE TABLE IF NOT EXISTS pending_invoices (
+    payment_hash TEXT PRIMARY KEY,
+    metadata TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    description TEXT,
+    payment_request TEXT,
+    created_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS processed_payments (
+    payment_id TEXT PRIMARY KEY,
+    created_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS bulk_quotes (
+    quote_id TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_pending_created ON pending_invoices(created_at);
+  CREATE INDEX IF NOT EXISTS idx_processed_created ON processed_payments(created_at);
+  CREATE INDEX IF NOT EXISTS idx_quotes_created ON bulk_quotes(created_at);
+`;
+
 export interface Pixel {
   id?: number;
   x: number;
@@ -65,7 +90,7 @@ export interface Activity {
   type: string;
 }
 
-export class PixelDatabase {
+export class PixelDatabase implements PendingInvoiceStore {
   private db: Database.Database;
   private dbPath: string;
 
@@ -85,13 +110,14 @@ export class PixelDatabase {
 
   private initialize() {
     console.log('Opening database at:', this.dbPath);
-    // Enable WAL mode for better performance
-    // this.db.pragma('journal_mode = WAL');
+    // Enable WAL mode for better performance + crash safety
+    this.db.pragma('journal_mode = WAL');
 
     // Create tables
     this.db.exec(CREATE_PIXELS_TABLE);
     this.db.exec(CREATE_ACTIVITY_TABLE);
     this.db.exec(CREATE_INDEXES);
+    this.db.exec(CREATE_PAYMENT_STATE_TABLES);
 
     // Add gift columns (Phase 1 — gift a pixel feature)
     // SQLite ALTER TABLE ADD COLUMN is idempotent-safe with try/catch
@@ -257,6 +283,95 @@ export class PixelDatabase {
       LIMIT ?
     `);
     return stmt.all(limit) as Pixel[];
+  }
+
+  // Run fn atomically (nested calls become savepoints)
+  runInTransaction<T>(fn: () => T): T {
+    return this.db.transaction(fn)();
+  }
+
+  // --- Pending invoices (Blink paymentHash → invoice context) ---
+
+  savePendingInvoice(paymentHash: string, entry: PendingInvoiceRecord): void {
+    this.db.prepare(`
+      INSERT OR REPLACE INTO pending_invoices (payment_hash, metadata, amount, description, payment_request, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(paymentHash, JSON.stringify(entry.metadata), entry.amount, entry.description || null, entry.paymentRequest || null, entry.createdAt);
+  }
+
+  getPendingInvoice(paymentHash: string): PendingInvoiceRecord | undefined {
+    const row = this.db.prepare('SELECT * FROM pending_invoices WHERE payment_hash = ?').get(paymentHash) as any;
+    return row ? this.hydratePending(row) : undefined;
+  }
+
+  findPendingInvoicesByMemoAmount(memo: string | null, amount: number): Array<{ paymentHash: string; entry: PendingInvoiceRecord }> {
+    const rows = this.db.prepare(
+      'SELECT * FROM pending_invoices WHERE amount = ? AND COALESCE(description, "") = COALESCE(?, "")'
+    ).all(amount, memo) as any[];
+    return rows.map((row) => ({ paymentHash: row.payment_hash, entry: this.hydratePending(row) }));
+  }
+
+  deletePendingInvoice(paymentHash: string): void {
+    this.db.prepare('DELETE FROM pending_invoices WHERE payment_hash = ?').run(paymentHash);
+  }
+
+  listPendingInvoices(): Array<{ paymentHash: string; entry: PendingInvoiceRecord }> {
+    const rows = this.db.prepare('SELECT * FROM pending_invoices ORDER BY created_at ASC').all() as any[];
+    return rows.map((row) => ({ paymentHash: row.payment_hash, entry: this.hydratePending(row) }));
+  }
+
+  purgePendingInvoicesOlderThan(maxAgeMs: number): number {
+    const cutoff = Date.now() - maxAgeMs;
+    const result = this.db.prepare('DELETE FROM pending_invoices WHERE created_at < ?').run(cutoff);
+    return result.changes;
+  }
+
+  private hydratePending(row: any): PendingInvoiceRecord {
+    return {
+      metadata: JSON.parse(row.metadata),
+      amount: row.amount,
+      description: row.description ?? undefined,
+      paymentRequest: row.payment_request ?? undefined,
+      createdAt: row.created_at
+    };
+  }
+
+  // --- Processed payments (idempotency) ---
+
+  isPaymentProcessed(paymentId: string): boolean {
+    return !!this.db.prepare('SELECT 1 FROM processed_payments WHERE payment_id = ?').get(paymentId);
+  }
+
+  markPaymentProcessed(paymentId: string): void {
+    this.db.prepare('INSERT OR IGNORE INTO processed_payments (payment_id, created_at) VALUES (?, ?)').run(paymentId, Date.now());
+  }
+
+  purgeProcessedPaymentsOlderThan(maxAgeMs: number): number {
+    const cutoff = Date.now() - maxAgeMs;
+    const result = this.db.prepare('DELETE FROM processed_payments WHERE created_at < ?').run(cutoff);
+    return result.changes;
+  }
+
+  // --- Bulk quotes (server-side purchase intent) ---
+
+  saveQuote(quoteId: string, quote: any): void {
+    this.db.prepare('INSERT OR REPLACE INTO bulk_quotes (quote_id, data, created_at) VALUES (?, ?, ?)')
+      .run(quoteId, JSON.stringify(quote), quote.createdAt || Date.now());
+  }
+
+  getQuote(quoteId: string): any | undefined {
+    const row = this.db.prepare('SELECT data FROM bulk_quotes WHERE quote_id = ?').get(quoteId) as any;
+    return row ? JSON.parse(row.data) : undefined;
+  }
+
+  deleteQuote(quoteId: string): void {
+    this.db.prepare('DELETE FROM bulk_quotes WHERE quote_id = ?').run(quoteId);
+  }
+
+  purgeQuotesOlderThan(maxAgeMs: number): number {
+    const cutoff = Date.now() - maxAgeMs;
+    const result = this.db.prepare('DELETE FROM bulk_quotes WHERE created_at < ?').run(cutoff);
+    return result.changes;
   }
 
   // Create database backup

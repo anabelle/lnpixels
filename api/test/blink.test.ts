@@ -6,6 +6,7 @@ const fetchMock = vi.fn();
 vi.stubGlobal('fetch', fetchMock);
 
 import { BlinkAdapter, createPaymentsAdapter } from '../src/payments.js';
+import { createTestDatabase } from '../src/database.js';
 
 const SECRET_RAW = crypto.randomBytes(24);
 const WHSEC = `whsec_${SECRET_RAW.toString('base64')}`;
@@ -64,10 +65,8 @@ describe('BlinkAdapter', () => {
     expect(invoiceCall[1].headers['X-API-KEY']).toBe('blink_test_key');
     expect(body.variables.input).toEqual({ amount: 100, walletId: 'btc-wallet', memo: 'Pixel purchase: (1, 2)' });
 
-    // Pending metadata must now be resolvable from a webhook (+ pull-verify fetch)
-    fetchMock.mockResolvedValueOnce(graphqlResponse({ me: { defaultAccount: { transactions: { edges: [
-      { node: { direction: 'RECEIVE', status: 'SUCCESS', settlementAmount: 100, initiationVia: { paymentHash: 'abc123hash' } } }
-    ] } } } }));
+    // Pending metadata must now be resolvable from a webhook (+ pull-verify via O(1) status query)
+    fetchMock.mockResolvedValueOnce(graphqlResponse({ lnInvoicePaymentStatus: { errors: [], status: 'PAID' } }));
     const evt = await adapter.extractPaymentEvent!(JSON.stringify({
       eventType: 'receive.lightning',
       transaction: {
@@ -181,11 +180,143 @@ describe('BlinkAdapter', () => {
         eventType: 'receive.lightning',
         transaction: { status: 'success', settlementAmount: 5, initiationVia: { paymentHash: 'ih2' } }
       });
-      fetchMock.mockResolvedValueOnce(graphqlResponse({ me: { defaultAccount: { transactions: { edges: [
-        { node: { direction: 'RECEIVE', status: 'SUCCESS', settlementAmount: 5, initiationVia: { paymentHash: 'ih2' } } }
-      ] } } } }));
+      fetchMock.mockResolvedValueOnce(graphqlResponse({ lnInvoicePaymentStatus: { errors: [], status: 'PAID' } }));
       expect(await adapter.extractPaymentEvent!(payload)).not.toBeNull();
       expect(await adapter.extractPaymentEvent!(payload)).toBeNull(); // consumed
+    });
+  });
+
+  describe('SQLite persistence (fix 4)', () => {
+    it('pending invoice survives adapter restart — webhook settles against new instance', async () => {
+      process.env.BLINK_WALLET_ID = 'w1';
+      const db = createTestDatabase(':memory:');
+
+      const first = new BlinkAdapter(db);
+      fetchMock.mockResolvedValue(graphqlResponse({ lnInvoiceCreate: { invoice: {
+        paymentRequest: 'lnbc1n1r', paymentHash: 'pers1', satoshis: 33
+      }, errors: [] } }));
+      await first.createInvoice(33, 'Pixel purchase: (7, 8)', { x: 7, y: 8 });
+
+      // "restart": brand-new adapter over the same SQLite file
+      const second = new BlinkAdapter(db);
+      fetchMock.mockResolvedValueOnce(graphqlResponse({ lnInvoicePaymentStatus: { errors: [], status: 'PAID' } }));
+      const evt = await second.extractPaymentEvent!(JSON.stringify({
+        eventType: 'receive.lightning',
+        transaction: { status: 'success', settlementAmount: 33, initiationVia: { paymentHash: 'pers1' } }
+      }));
+      expect(evt).toMatchObject({ event: 'payment.completed', payment_id: 'pers1', metadata: { x: 7, y: 8 }, amount: 33 });
+      db.close();
+    });
+
+    it('verifySettled uses O(1) lnInvoicePaymentStatus when paymentRequest is known', async () => {
+      process.env.BLINK_WALLET_ID = 'w1';
+      fetchMock.mockResolvedValue(graphqlResponse({ lnInvoiceCreate: { invoice: {
+        paymentRequest: 'lnbc1n1s', paymentHash: 'o1hash', satoshis: 9
+      }, errors: [] } }));
+      await adapter.createInvoice(9, 'd', { x: 1 });
+
+      // Next call should be the status query (PAID) — no transactions scan
+      fetchMock.mockResolvedValueOnce(graphqlResponse({ lnInvoicePaymentStatus: { errors: [], status: 'PAID' } }));
+      const evt = await adapter.extractPaymentEvent!(JSON.stringify({
+        eventType: 'receive.lightning',
+        transaction: { status: 'success', settlementAmount: 9, initiationVia: { paymentHash: 'o1hash' } }
+      }));
+      expect(evt).toMatchObject({ payment_id: 'o1hash' });
+      const statusCall = fetchMock.mock.calls.at(-1)!;
+      expect(JSON.parse(statusCall[1].body).query).toContain('lnInvoicePaymentStatus');
+    });
+
+    it('falls back to transactions scan when status query fails', async () => {
+      process.env.BLINK_WALLET_ID = 'w1';
+      fetchMock.mockResolvedValue(graphqlResponse({ lnInvoiceCreate: { invoice: {
+        paymentRequest: 'lnbc1n1t', paymentHash: 'fb1hash', satoshis: 11
+      }, errors: [] } }));
+      await adapter.createInvoice(11, 'd', { x: 2 });
+
+      fetchMock.mockResolvedValueOnce({ ok: false, status: 500, text: async () => 'boom' });
+      fetchMock.mockResolvedValueOnce(graphqlResponse({ me: { defaultAccount: { transactions: { edges: [
+        { node: { direction: 'RECEIVE', status: 'SUCCESS', settlementAmount: 11, initiationVia: { paymentHash: 'fb1hash' } } }
+      ] } } } }));
+      const evt = await adapter.extractPaymentEvent!(JSON.stringify({
+        eventType: 'receive.lightning',
+        transaction: { status: 'success', settlementAmount: 11, initiationVia: { paymentHash: 'fb1hash' } }
+      }));
+      expect(evt).toMatchObject({ payment_id: 'fb1hash' });
+    });
+
+    it('pollPendingEvents settles paid invoices missed by webhooks (reconcile)', async () => {
+      process.env.BLINK_WALLET_ID = 'w1';
+      const db = createTestDatabase(':memory:');
+      const a = new BlinkAdapter(db);
+      fetchMock.mockResolvedValue(graphqlResponse({ lnInvoiceCreate: { invoice: {
+        paymentRequest: 'lnbc1n1u', paymentHash: 'rec1', satoshis: 44
+      }, errors: [] } }));
+      await a.createInvoice(44, 'Pixel purchase: (9, 9)', { quoteId: 'q1', type: 'pixel_set' });
+
+      // Restart — no webhook ever arrives. Poll says PAID.
+      const b = new BlinkAdapter(db);
+      fetchMock.mockResolvedValueOnce(graphqlResponse({ lnInvoicePaymentStatus: { errors: [], status: 'PAID' } }));
+      const events = await b.pollPendingEvents!();
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({ event: 'payment.completed', payment_id: 'rec1', amount: 44, metadata: { quoteId: 'q1' } });
+
+      // Consumed: second poll finds nothing (no fetch happens)
+      expect(await b.pollPendingEvents!()).toHaveLength(0);
+      db.close();
+    });
+
+    it('pollPendingEvents leaves unpaid invoices pending', async () => {
+      process.env.BLINK_WALLET_ID = 'w1';
+      const db = createTestDatabase(':memory:');
+      const a = new BlinkAdapter(db);
+      fetchMock.mockResolvedValue(graphqlResponse({ lnInvoiceCreate: { invoice: {
+        paymentRequest: 'lnbc1n1v', paymentHash: 'rec2', satoshis: 55
+      }, errors: [] } }));
+      await a.createInvoice(55, 'd', { x: 5 });
+
+      fetchMock.mockResolvedValueOnce(graphqlResponse({ lnInvoicePaymentStatus: { errors: [], status: 'PENDING' } }));
+      expect(await a.pollPendingEvents!()).toHaveLength(0);
+      db.close();
+    });
+  });
+
+  describe('database payment-state tables', () => {
+    it('quotes roundtrip and purge', () => {
+      const db = createTestDatabase(':memory:');
+      const quote = { pixelUpdates: [{ x: 1, y: 2, color: '#FF0000', price: 5 }], totalPrice: 5, totalPixels: 1, createdAt: Date.now() - 20 * 60000 };
+      db.saveQuote('q_old', quote);
+      db.saveQuote('q_new', { ...quote, createdAt: Date.now() });
+      expect(db.getQuote('q_old')).toEqual(quote);
+      expect(db.purgeQuotesOlderThan(10 * 60000)).toBe(1);
+      expect(db.getQuote('q_old')).toBeUndefined();
+      expect(db.getQuote('q_new')).toBeDefined();
+      db.deleteQuote('q_new');
+      expect(db.getQuote('q_new')).toBeUndefined();
+      db.close();
+    });
+
+    it('processed payments roundtrip and purge', () => {
+      const db = createTestDatabase(':memory:');
+      expect(db.isPaymentProcessed('p1')).toBe(false);
+      db.markPaymentProcessed('p1');
+      db.markPaymentProcessed('p1'); // idempotent
+      expect(db.isPaymentProcessed('p1')).toBe(true);
+      db.markPaymentProcessed('p2');
+      db.purgeProcessedPaymentsOlderThan(24 * 3600 * 1000);
+      expect(db.isPaymentProcessed('p1')).toBe(true); // fresh markers survive
+      db.close();
+    });
+
+    it('runInTransaction rolls back everything on failure', () => {
+      const db = createTestDatabase(':memory:');
+      db.saveQuote('qt', { pixelUpdates: [], totalPrice: 0, totalPixels: 0, createdAt: Date.now() });
+      expect(() => db.runInTransaction(() => {
+        db.deleteQuote('qt');
+        throw new Error('boom');
+      })).toThrow('boom');
+      // Quote deletion rolled back
+      expect(db.getQuote('qt')).toBeDefined();
+      db.close();
     });
   });
 });

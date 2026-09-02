@@ -18,6 +18,72 @@ export interface PaymentsAdapter {
   verifyWebhook(rawBody: string, signature: string, headers?: Record<string, string | string[] | undefined>): boolean;
   /** Normalize a provider webhook payload; null = ignore. May verify server-side (pull). */
   extractPaymentEvent?(rawBody: string): Promise<NormalizedPaymentEvent | null>;
+  /** Reconcile pending invoices against provider state (missed webhooks). */
+  pollPendingEvents?(): Promise<NormalizedPaymentEvent[]>;
+}
+
+/** Invoice context awaiting settlement. Persisted via PendingInvoiceStore. */
+export interface PendingInvoiceRecord {
+  metadata: any;
+  amount: number;
+  description: string;
+  paymentRequest?: string;
+  createdAt: number;
+}
+
+export interface PendingInvoiceHash {
+  paymentHash: string;
+  entry: PendingInvoiceRecord;
+}
+
+/** Pluggable persistence for pending invoices (SQLite in prod, Map in tests/fallback) */
+export interface PendingInvoiceStore {
+  savePendingInvoice(paymentHash: string, entry: PendingInvoiceRecord): void;
+  getPendingInvoice(paymentHash: string): PendingInvoiceRecord | undefined;
+  findPendingInvoicesByMemoAmount(memo: string | null, amount: number): PendingInvoiceHash[];
+  deletePendingInvoice(paymentHash: string): void;
+  listPendingInvoices(): PendingInvoiceHash[];
+  purgePendingInvoicesOlderThan(maxAgeMs: number): number;
+}
+
+/** In-memory fallback store — same semantics as the SQLite-backed one */
+export class MemoryPendingStore implements PendingInvoiceStore {
+  private map = new Map<string, PendingInvoiceRecord>();
+
+  savePendingInvoice(paymentHash: string, entry: PendingInvoiceRecord): void {
+    this.map.set(paymentHash, entry);
+  }
+
+  getPendingInvoice(paymentHash: string): PendingInvoiceRecord | undefined {
+    return this.map.get(paymentHash);
+  }
+
+  findPendingInvoicesByMemoAmount(memo: string | null, amount: number): PendingInvoiceHash[] {
+    const out: PendingInvoiceHash[] = [];
+    for (const [paymentHash, entry] of this.map) {
+      if ((entry.description || null) === (memo || null) && entry.amount === amount) {
+        out.push({ paymentHash, entry });
+      }
+    }
+    return out;
+  }
+
+  deletePendingInvoice(paymentHash: string): void {
+    this.map.delete(paymentHash);
+  }
+
+  listPendingInvoices(): PendingInvoiceHash[] {
+    return Array.from(this.map.entries()).map(([paymentHash, entry]) => ({ paymentHash, entry }));
+  }
+
+  purgePendingInvoicesOlderThan(maxAgeMs: number): number {
+    const cutoff = Date.now() - maxAgeMs;
+    let removed = 0;
+    for (const [paymentHash, entry] of this.map) {
+      if (entry.createdAt < cutoff) { this.map.delete(paymentHash); removed++; }
+    }
+    return removed;
+  }
 }
 
 export class NakaPayAdapter implements PaymentsAdapter {
@@ -140,8 +206,8 @@ export class MockPaymentsAdapter implements PaymentsAdapter {
 
 /**
  * Blink (Galoy) adapter — https://api.blink.sv/graphql, X-API-KEY auth (scope: Read+Receive).
- * Blink webhooks don't echo metadata, so we keep a local paymentHash→metadata map
- * filled at invoice creation and consumed by extractPaymentEvent().
+ * Blink webhooks don't echo metadata, so pending invoice context (paymentHash → metadata)
+ * lives in a PendingInvoiceStore — SQLite in production (survives restarts), Map fallback.
  * Webhook signatures follow the Standard Webhooks spec (Svix): v1, HMAC-SHA256,
  * signed content `${svix-id}.${svix-timestamp}.${payload}`, 5-minute tolerance.
  */
@@ -149,33 +215,23 @@ export class BlinkAdapter implements PaymentsAdapter {
   private apiKey: string;
   private endpoint: string;
   private walletId: string | null = null;
-  // paymentHash → invoice context awaiting webhook
-  private pendingByHash = new Map<string, { metadata: any; amount: number; description: string; createdAt: number }>();
+  private store: PendingInvoiceStore;
   private warnedNoSecret = false;
   private readonly PENDING_MAX_AGE = 24 * 3600 * 1000; // invoices live far less; safety cap
-  private readonly PENDING_MAX_SIZE = 5000;
 
-  constructor() {
+  constructor(store: PendingInvoiceStore = new MemoryPendingStore()) {
     const apiKey = process.env.BLINK_API_KEY;
     if (!apiKey) {
       throw new Error('BLINK_API_KEY environment variable is required');
     }
     this.apiKey = apiKey;
+    this.store = store;
     this.endpoint = process.env.BLINK_API_ENDPOINT || 'https://api.blink.sv/graphql';
-    const timer = setInterval(() => this.purgePending(), 10 * 60000);
+    const timer = setInterval(() => {
+      const removed = this.store.purgePendingInvoicesOlderThan(this.PENDING_MAX_AGE);
+      if (removed > 0) console.log(`Blink: purged ${removed} stale pending invoices`);
+    }, 10 * 60000);
     timer.unref?.();
-  }
-
-  private purgePending() {
-    const cutoff = Date.now() - this.PENDING_MAX_AGE;
-    for (const [hash, entry] of this.pendingByHash) {
-      if (entry.createdAt < cutoff) this.pendingByHash.delete(hash);
-    }
-    while (this.pendingByHash.size > this.PENDING_MAX_SIZE) {
-      const first = this.pendingByHash.keys().next().value;
-      if (first === undefined) break;
-      this.pendingByHash.delete(first);
-    }
   }
 
   private async graphql(query: string, variables: Record<string, any>): Promise<any> {
@@ -230,7 +286,11 @@ export class BlinkAdapter implements PaymentsAdapter {
       if (!inv?.paymentRequest || !inv?.paymentHash) {
         throw new Error(errs?.[0]?.message || 'Blink returned no invoice');
       }
-      this.pendingByHash.set(inv.paymentHash, { metadata, amount, description, createdAt: Date.now() });
+      this.store.savePendingInvoice(inv.paymentHash, {
+        metadata, amount, description,
+        paymentRequest: inv.paymentRequest,
+        createdAt: Date.now()
+      });
       return {
         id: inv.paymentHash,
         invoice: inv.paymentRequest,
@@ -279,17 +339,52 @@ export class BlinkAdapter implements PaymentsAdapter {
       });
   }
 
-  /** Server-side truth check: the payment hash must be a SUCCESS RECEIVE in recent account transactions */
+  /** O(1) invoice status query — returns true (PAID), false (PENDING/EXPIRED) or null (unknown/error) */
+  private async invoicePaid(paymentRequest: string): Promise<boolean | null> {
+    try {
+      // NOTE: LnInvoicePaymentStatusInput takes paymentRequest only (walletId is rejected by the API)
+      const data = await this.graphql(
+        `query S($input: LnInvoicePaymentStatusInput!) {
+          lnInvoicePaymentStatus(input: $input) { errors { message } status }
+        }`,
+        { input: { paymentRequest } }
+      );
+      const st = data?.lnInvoicePaymentStatus;
+      if (st?.errors?.length) throw new Error(st.errors[0].message);
+      if (st?.status === 'PAID') return true;
+      if (st?.status === 'PENDING' || st?.status === 'EXPIRED') return false;
+      return null;
+    } catch (err: any) {
+      console.error(`Blink invoice status query failed: ${err.message}`);
+      return null;
+    }
+  }
+
+  private async recentTxNodes(first: number): Promise<any[]> {
+    const data = await this.graphql(
+      `query T($first: Int) { me { defaultAccount { transactions(first: $first) { edges { node {
+        id direction status settlementAmount memo
+        initiationVia { ... on InitiationViaLn { paymentHash } }
+      } } } } } }`,
+      { first }
+    );
+    return data?.me?.defaultAccount?.transactions?.edges?.map((e: any) => e.node) || [];
+  }
+
+  /** Server-side truth check: the payment must be a SUCCESS RECEIVE in the account */
   private async verifySettled(paymentHash?: string, expectedAmount?: number, txId?: string): Promise<boolean> {
     try {
-      const data = await this.graphql(
-        `query T($first: Int) { me { defaultAccount { transactions(first: $first) { edges { node {
-          direction status settlementAmount
-          initiationVia { ... on InitiationViaLn { paymentHash } }
-        } } } } } }`,
-        { first: 20 }
-      );
-      const nodes: any[] = data?.me?.defaultAccount?.transactions?.edges?.map((e: any) => e.node) || [];
+      if (paymentHash) {
+        // Fast path: ask Blink directly for the invoice status
+        const pending = this.store.getPendingInvoice(paymentHash);
+        if (pending?.paymentRequest) {
+          const paid = await this.invoicePaid(pending.paymentRequest);
+          if (paid === true) return true;
+          // PAID is definitive; PENDING/EXPIRED/unknown fall through to the tx scan
+        }
+      }
+      // Slow path (intraledger by txId, legacy rows): scan recent transactions
+      const nodes = await this.recentTxNodes(20);
       const tx = nodes.find((n) => (paymentHash && n.initiationVia?.paymentHash === paymentHash) || (txId && n.id === txId));
       return !!tx && tx.status === 'SUCCESS' && tx.direction === 'RECEIVE'
         && (expectedAmount === undefined || tx.settlementAmount === expectedAmount);
@@ -311,16 +406,16 @@ export class BlinkAdapter implements PaymentsAdapter {
     if (!tx || tx.status !== 'success') return null;
 
     const hash: string | undefined = tx.initiationVia?.paymentHash;
-    let entry = hash ? this.pendingByHash.get(hash) : undefined;
+    let matchHash: string | undefined = hash;
+    let entry: PendingInvoiceRecord | undefined = hash ? this.store.getPendingInvoice(hash) : undefined;
 
     // Intraledger (Blink-to-Blink) payments carry no payment hash: best-effort
     // unique match by memo + amount among pending invoices.
     if (!entry && p.eventType === 'receive.intraledger') {
-      const matches = [...this.pendingByHash.entries()].filter(
-        ([, e]) => e.description === (tx.memo || null) && e.amount === tx.settlementAmount
-      );
+      const matches = this.store.findPendingInvoicesByMemoAmount(tx.memo || null, tx.settlementAmount);
       if (matches.length === 1) {
-        entry = matches[0][1];
+        matchHash = matches[0].paymentHash;
+        entry = matches[0].entry;
       } else {
         console.warn(`Blink intraledger webhook: ${matches.length} pending matches for memo="${tx.memo}", skipping`);
         return null;
@@ -340,7 +435,7 @@ export class BlinkAdapter implements PaymentsAdapter {
       console.warn(`Blink webhook: pull-verification FAILED for ${hash ? 'hash=' + hash.slice(0, 16) : 'tx=' + String(tx.id).slice(0, 16)} — ignoring`);
       return null;
     }
-    if (hash) this.pendingByHash.delete(hash);
+    if (matchHash) this.store.deletePendingInvoice(matchHash);
 
     return {
       event: 'payment.completed',
@@ -349,13 +444,54 @@ export class BlinkAdapter implements PaymentsAdapter {
       amount: tx.settlementAmount
     };
   }
+
+  /**
+   * Reconcile: settle pending invoices that were paid but whose webhook was missed
+   * (server restart, delivery failure). Truth comes exclusively from the Blink API.
+   */
+  async pollPendingEvents(): Promise<NormalizedPaymentEvent[]> {
+    const events: NormalizedPaymentEvent[] = [];
+    const pending = this.store.listPendingInvoices();
+    if (pending.length === 0) return events;
+
+    // One tx-list fetch covers rows without a stored paymentRequest (match by hash)
+    let nodes: any[] | null = null;
+    const loadNodes = async (): Promise<any[]> => {
+      if (nodes === null) nodes = await this.recentTxNodes(50);
+      return nodes;
+    };
+
+    for (const { paymentHash, entry } of pending) {
+      if (entry.paymentRequest) {
+        if (await this.invoicePaid(entry.paymentRequest) === true) {
+          this.store.deletePendingInvoice(paymentHash);
+          events.push({ event: 'payment.completed', payment_id: paymentHash, metadata: entry.metadata, amount: entry.amount });
+        }
+        continue;
+      }
+      // Legacy row (no paymentRequest): match by hash among recent transactions
+      const recent = await loadNodes();
+      const tx = recent.find((n) =>
+        n.status === 'SUCCESS' && n.direction === 'RECEIVE'
+        && n.initiationVia?.paymentHash === paymentHash && n.settlementAmount === entry.amount
+      );
+      if (tx) {
+        this.store.deletePendingInvoice(paymentHash);
+        events.push({ event: 'payment.completed', payment_id: paymentHash, metadata: entry.metadata, amount: entry.amount });
+      }
+    }
+    if (events.length > 0) {
+      console.log(`Blink reconcile: settled ${events.length} pending invoice(s) missed by webhooks`);
+    }
+    return events;
+  }
 }
 
 /** Provider-gated factory: PAYMENTS_PROVIDER override > BLINK_API_KEY > NAKAPAY_API_KEY > Mock */
-export function createPaymentsAdapter(): PaymentsAdapter {
+export function createPaymentsAdapter(store?: PendingInvoiceStore): PaymentsAdapter {
   const provider = (process.env.PAYMENTS_PROVIDER || '').toLowerCase();
   if (provider === 'blink' || (!provider && process.env.BLINK_API_KEY)) {
-    return new BlinkAdapter();
+    return new BlinkAdapter(store);
   }
   if (provider === 'nakapay' || (!provider && process.env.NAKAPAY_API_KEY)) {
     return new NakaPayAdapter();

@@ -1,11 +1,8 @@
 import { Router } from 'express';
 import { Namespace } from 'socket.io';
-import { PaymentsAdapter, NakaPayAdapter, MockPaymentsAdapter, createPaymentsAdapter } from './payments.js';
+import { PaymentsAdapter, NakaPayAdapter, MockPaymentsAdapter, createPaymentsAdapter, NormalizedPaymentEvent } from './payments.js';
 import { price } from './pricing.js';
 import { getDatabase, PixelDatabase, Pixel } from './database.js';
-
-// Track processed payment IDs for idempotency
-const processedPayments = new Set<string>();
 
 // Validation constants
 const MAX_COLOR_LENGTH = 7; // #RRGGBB format
@@ -46,67 +43,30 @@ function validateRectangleCoordinates(x1: number, y1: number, x2: number, y2: nu
 
 const router = Router();
 
-// Initialize payments adapter (provider-gated: Blink > NakaPay > Mock)
-const paymentsAdapter: PaymentsAdapter = createPaymentsAdapter();
-const isMockPayments = paymentsAdapter instanceof MockPaymentsAdapter;
-
 export function setupRoutes(io: Namespace, db?: PixelDatabase) {
   // Configurable limits (raise via env)
   const MAX_BULK_PIXELS = Number(process.env.MAX_BULK_PIXELS || 1000)
   const MAX_RECT_PIXELS = Number(process.env.MAX_RECT_PIXELS || 1000)
 
-  // Memory cleanup constants
+  // Cleanup constants
   const CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
   const QUOTE_TTL = 10 * 60 * 1000; // 10 minutes for quotes
-  const PAYMENT_TTL = 30 * 60 * 1000; // 30 minutes for payments
-  const MAX_PROCESSED_PAYMENTS = 10000; // Maximum payments to track
+  const PROCESSED_TTL = 24 * 60 * 60 * 1000; // 24 hours for processed-payment markers
 
   // Use provided database or get default instance
   const database = db || getDatabase();
 
-  // Enhanced in-memory stores with timestamps for cleanup
-  const bulkQuotes = new Map<string, { pixelUpdates: any[]; totalPrice: number; totalPixels: number; createdAt: number; giftRecipient?: string | null; giftRecipientType?: string | null; giftMessage?: string | null }>()
-  const processedPaymentsWithTimestamp = new Map<string, number>() // paymentId -> timestamp
+  // Initialize payments adapter (provider-gated: Blink > NakaPay > Mock),
+  // backed by the same SQLite db for payment-state persistence
+  const paymentsAdapter: PaymentsAdapter = createPaymentsAdapter(database);
+  const isMockPayments = paymentsAdapter instanceof MockPaymentsAdapter;
 
-  // Memory cleanup function
+  // Memory cleanup: purge expired quotes / stale payment markers from SQLite
   const cleanupOldEntries = () => {
-    const now = Date.now();
-    let cleanedQuotes = 0;
-    let cleanedPayments = 0;
-
-    // Clean old quotes
-    for (const [quoteId, quote] of bulkQuotes.entries()) {
-      if (now - quote.createdAt > QUOTE_TTL) {
-        bulkQuotes.delete(quoteId);
-        cleanedQuotes++;
-      }
-    }
-
-    // Clean old payments
-    for (const [paymentId, timestamp] of processedPaymentsWithTimestamp.entries()) {
-      if (now - timestamp > PAYMENT_TTL) {
-        processedPaymentsWithTimestamp.delete(paymentId);
-        processedPayments.delete(paymentId);
-        cleanedPayments++;
-      }
-    }
-
-    // Prevent excessive memory usage
-    if (processedPayments.size > MAX_PROCESSED_PAYMENTS) {
-      const oldestPayments = Array.from(processedPaymentsWithTimestamp.entries())
-        .sort(([, a], [, b]) => a - b)
-        .slice(0, Math.floor(MAX_PROCESSED_PAYMENTS * 0.2)); // Remove oldest 20%
-
-      for (const [paymentId] of oldestPayments) {
-        processedPayments.delete(paymentId);
-        processedPaymentsWithTimestamp.delete(paymentId);
-        cleanedPayments++;
-      }
-    }
-
+    const cleanedQuotes = database.purgeQuotesOlderThan(QUOTE_TTL);
+    const cleanedPayments = database.purgeProcessedPaymentsOlderThan(PROCESSED_TTL);
     if (cleanedQuotes > 0 || cleanedPayments > 0) {
       console.log(`Cleanup: removed ${cleanedQuotes} old quotes, ${cleanedPayments} old payments`);
-      console.log(`Current counts: quotes=${bulkQuotes.size}, payments=${processedPayments.size}`);
     }
   };
 
@@ -330,7 +290,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
       // Store quote server-side
       const quoteId = `q_${Date.now()}_${Math.random().toString(36).slice(2)}`
-      bulkQuotes.set(quoteId, { pixelUpdates, totalPrice, totalPixels, createdAt: Date.now() })
+      database.saveQuote(quoteId, { pixelUpdates, totalPrice, totalPixels, createdAt: Date.now() })
 
       // Create invoice with minimal metadata
       const invoice = await paymentsAdapter.createInvoice(
@@ -433,7 +393,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
       // Store quote server-side (with gift metadata)
       const quoteId = `q_${Date.now()}_${Math.random().toString(36).slice(2)}`
-      bulkQuotes.set(quoteId, {
+      database.saveQuote(quoteId, {
         pixelUpdates,
         totalPrice,
         totalPixels: pixels.length,
@@ -465,6 +425,157 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
     }
   });
 
+  // Shared payment-completion processing (webhook + reconcile). Persists pixels,
+  // activity, quote consumption and the idempotency marker atomically; emits after commit.
+  const handlePaymentCompleted = async (payload: NormalizedPaymentEvent): Promise<'processed' | 'duplicate' | 'quote_missing' | 'error'> => {
+    const paymentId = payload.payment_id;
+
+    // Idempotency (survives restarts — SQLite-backed)
+    if (database.isPaymentProcessed(paymentId)) {
+      console.log(`Payment ${paymentId} already processed, skipping`);
+      return 'duplicate';
+    }
+
+    const metadata = payload.metadata;
+
+    try {
+      if (metadata.quoteId) {
+        // Bulk payment resolved via server-side quote
+        const quote = database.getQuote(metadata.quoteId);
+        if (!quote) {
+          console.error('Quote not found or expired:', metadata.quoteId);
+          return 'quote_missing';
+        }
+
+        const timestamp = Date.now();
+        const activityRecords: any[] = [];
+        const savedPixels = database.runInTransaction(() => {
+          const pixelData = quote.pixelUpdates.map((update: any) => ({
+            x: update.x,
+            y: update.y,
+            color: update.color || '#000000',
+            letter: update.letter,
+            sats: update.price,
+            gift_recipient: quote.giftRecipient || null,
+            gift_recipient_type: quote.giftRecipientType || null,
+            gift_message: quote.giftMessage || null,
+          }));
+          const pixels = database.upsertPixels(pixelData);
+          for (const update of quote.pixelUpdates) {
+            activityRecords.push(database.insertActivity({
+              x: update.x,
+              y: update.y,
+              color: update.color || '#000000',
+              letter: update.letter,
+              sats: update.price,
+              payment_hash: paymentId,
+              created_at: timestamp,
+              type: 'bulk_purchase'
+            }));
+          }
+          // Consume the quote + idempotency marker in the same transaction
+          database.deleteQuote(metadata.quoteId);
+          database.markPaymentProcessed(paymentId);
+          return pixels;
+        });
+
+        console.log('Created bulk activity records:', activityRecords);
+
+        // Emit real-time updates for each pixel
+        savedPixels.forEach(pixel => io.emit('pixel.update', pixel));
+
+        // Emit activity summary for bulk purchase
+        if (activityRecords.length > 0) {
+          const summaryActivity = {
+            ...activityRecords[0],
+            summary: `${activityRecords.length} pixels purchased`,
+            type: 'bulk_purchase',
+            pixelCount: activityRecords.length,
+            totalSats: typeof payload?.amount === 'number' ? payload.amount : activityRecords.reduce((sum: number, r: any) => sum + (r?.sats || 0), 0)
+          };
+          io.emit('activity.append', summaryActivity);
+        }
+      } else if (metadata.pixelUpdates) {
+        // Backward compatibility: older flows that still send pixelUpdates in metadata
+        const timestamp = Date.now();
+        const activityRecords: any[] = [];
+        const savedPixels = database.runInTransaction(() => {
+          const pixelData = metadata.pixelUpdates.map((update: any) => ({
+            x: update.x,
+            y: update.y,
+            color: update.color || '#000000',
+            letter: update.letter,
+            sats: update.price
+          }));
+          const pixels = database.upsertPixels(pixelData);
+          for (const update of metadata.pixelUpdates) {
+            activityRecords.push(database.insertActivity({
+              x: update.x,
+              y: update.y,
+              color: update.color || '#000000',
+              letter: update.letter,
+              sats: update.price,
+              payment_hash: paymentId,
+              created_at: timestamp,
+              type: 'bulk_purchase'
+            }));
+          }
+          database.markPaymentProcessed(paymentId);
+          return pixels;
+        });
+        savedPixels.forEach(pixel => io.emit('pixel.update', pixel));
+        if (activityRecords.length > 0) {
+          const totalSats = Array.isArray(metadata?.pixelUpdates)
+            ? metadata.pixelUpdates.reduce((sum: number, u: any) => sum + (u?.price || 0), 0)
+            : activityRecords.reduce((sum: number, r: any) => sum + (r?.sats || 0), 0);
+          const summaryActivity = { ...activityRecords[0], summary: `${activityRecords.length} pixels purchased`, type: 'bulk_purchase', pixelCount: activityRecords.length, totalSats };
+          io.emit('activity.append', summaryActivity);
+        }
+      } else {
+        // Single pixel payment - use database upsert
+        const timestamp = Date.now();
+        let activityRecord: any;
+        const savedPixel = database.runInTransaction(() => {
+          const pixel = database.upsertPixel({
+            x: metadata.x,
+            y: metadata.y,
+            color: metadata.color || '#000000',
+            letter: metadata.letter,
+            sats: payload.amount ?? 0
+          });
+          activityRecord = database.insertActivity({
+            x: metadata.x,
+            y: metadata.y,
+            color: metadata.color || '#000000',
+            letter: metadata.letter,
+            sats: payload.amount ?? 0,
+            payment_hash: paymentId,
+            created_at: timestamp,
+            type: 'single_purchase'
+          });
+          database.markPaymentProcessed(paymentId);
+          return pixel;
+        });
+
+        console.log('Created activity record:', activityRecord);
+        io.emit('pixel.update', savedPixel);
+        io.emit('activity.append', activityRecord);
+      }
+
+      // Emit payment confirmation event for the specific payment
+      io.emit('payment.confirmed', {
+        paymentId: paymentId,
+        amount: payload.amount,
+        timestamp: Date.now(),
+        metadata
+      });
+      return 'processed';
+    } catch (error) {
+      console.error('Error saving payment outcome to database:', error);
+      return 'error';
+    }
+  };
+
   // POST /nakapay | /blink - Handle provider webhooks (NakaPay or Blink)
   router.post(['/nakapay', '/blink'], async (req, res) => {
     try {
@@ -490,173 +601,11 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         return res.json({ success: true, ignored: true });
       }
 
-      // Handle payment completion
       if (payload.event === 'payment.completed') {
-        const paymentId = payload.payment_id;
-
-        // Check for idempotency
-        if (processedPayments.has(paymentId)) {
-          console.log(`Payment ${paymentId} already processed, skipping`);
-          return res.json({ success: true, message: 'Already processed' });
-        }
-
-        const metadata = payload.metadata;
-
-        if (metadata.quoteId) {
-          // Bulk payment resolved via server-side quote
-          const quote = bulkQuotes.get(metadata.quoteId)
-          if (!quote) {
-            console.error('Quote not found or expired:', metadata.quoteId)
-            return res.status(410).json({ error: 'Quote not found or expired' })
-          }
-          const pixelData = quote.pixelUpdates.map((update: any) => ({
-            x: update.x,
-            y: update.y,
-            color: update.color || '#000000',
-            letter: update.letter,
-            sats: update.price,
-            gift_recipient: quote.giftRecipient || null,
-            gift_recipient_type: quote.giftRecipientType || null,
-            gift_message: quote.giftMessage || null,
-          }));
-
-          try {
-            const savedPixels = database.upsertPixels(pixelData);
-
-            // Insert activity records for bulk purchase
-            const timestamp = Date.now();
-            const activityRecords = quote.pixelUpdates.map((update: any) =>
-              database.insertActivity({
-                x: update.x,
-                y: update.y,
-                color: update.color || '#000000', // Default to black for basic pixels
-                letter: update.letter,
-                sats: update.price,
-                payment_hash: paymentId,
-                created_at: timestamp,
-                type: 'bulk_purchase'
-              })
-            );
-
-            console.log('Created bulk activity records:', activityRecords);
-
-            // Emit real-time updates for each pixel
-            savedPixels.forEach(pixel => {
-              console.log('Emitting pixel.update for bulk purchase:', pixel);
-              io.emit('pixel.update', pixel);
-            });
-
-            // Emit activity summary for bulk purchase
-            if (activityRecords.length > 0) {
-              const summaryActivity = {
-                ...activityRecords[0], // Use first record as base
-                summary: `${activityRecords.length} pixels purchased`,
-                type: 'bulk_purchase',
-                pixelCount: activityRecords.length,
-                totalSats: typeof payload?.amount === 'number' ? payload.amount : activityRecords.reduce((sum: number, r: any) => sum + (r?.sats || 0), 0)
-              };
-              console.log('Emitting bulk activity.append event:', summaryActivity);
-              io.emit('activity.append', summaryActivity);
-            }
-
-            // Consume the quote after success
-            bulkQuotes.delete(metadata.quoteId)
-          } catch (error) {
-            console.error('Error saving bulk pixels to database:', error);
-            return res.status(500).json({ error: 'Failed to save pixels' });
-          }
-        } else if (metadata.pixelUpdates) {
-          // Backward compatibility: older flows that still send pixelUpdates in metadata
-          const pixelData = metadata.pixelUpdates.map((update: any) => ({
-            x: update.x,
-            y: update.y,
-            color: update.color || '#000000',
-            letter: update.letter,
-            sats: update.price
-          }));
-          try {
-            const savedPixels = database.upsertPixels(pixelData);
-            const timestamp = Date.now();
-            const activityRecords = metadata.pixelUpdates.map((update: any) =>
-              database.insertActivity({
-                x: update.x,
-                y: update.y,
-                color: update.color || '#000000',
-                letter: update.letter,
-                sats: update.price,
-                payment_hash: paymentId,
-                created_at: timestamp,
-                type: 'bulk_purchase'
-              })
-            );
-            savedPixels.forEach(pixel => io.emit('pixel.update', pixel));
-            if (activityRecords.length > 0) {
-              const totalSats = Array.isArray(metadata?.pixelUpdates)
-                ? metadata.pixelUpdates.reduce((sum: number, u: any) => sum + (u?.price || 0), 0)
-                : activityRecords.reduce((sum: number, r: any) => sum + (r?.sats || 0), 0);
-              const summaryActivity = { ...activityRecords[0], summary: `${activityRecords.length} pixels purchased`, type: 'bulk_purchase', pixelCount: activityRecords.length, totalSats };
-              io.emit('activity.append', summaryActivity);
-            }
-          } catch (error) {
-            console.error('Error saving bulk pixels to database:', error);
-            return res.status(500).json({ error: 'Failed to save pixels' });
-          }
-        } else {
-          // Single pixel payment - use database upsert
-          try {
-            const savedPixel = database.upsertPixel({
-              x: metadata.x,
-              y: metadata.y,
-              color: metadata.color || '#000000', // Default to black for basic pixels
-              letter: metadata.letter,
-              sats: payload.amount
-            });
-
-            // Insert activity record for single purchase
-            const timestamp = Date.now();
-            const activityRecord = database.insertActivity({
-              x: metadata.x,
-              y: metadata.y,
-              color: metadata.color || '#000000', // Default to black for basic pixels
-              letter: metadata.letter,
-              sats: payload.amount,
-              payment_hash: paymentId,
-              created_at: timestamp,
-              type: 'single_purchase'
-            });
-
-            console.log('Created activity record:', activityRecord);
-
-            // Emit real-time updates
-            console.log('Emitting pixel.update event:', savedPixel);
-            io.emit('pixel.update', savedPixel);
-            console.log('Emitting activity.append event:', activityRecord);
-            io.emit('activity.append', activityRecord);
-          } catch (error) {
-            console.error('Error saving pixel to database:', error);
-            return res.status(500).json({ error: 'Failed to save pixel' });
-          }
-        }
-
-        // Emit activity update
-        io.emit('activity.append', {
-          type: 'payment',
-          amount: payload.amount,
-          timestamp: Date.now(),
-          metadata
-        });
-
-        // Emit payment confirmation event for the specific payment
-        io.emit('payment.confirmed', {
-          paymentId: paymentId,
-          amount: payload.amount,
-          timestamp: Date.now(),
-          metadata
-        });
-
-        // Mark payment as processed for idempotency
-        processedPayments.add(paymentId);
-        processedPaymentsWithTimestamp.set(paymentId, Date.now());
+        const result = await handlePaymentCompleted(payload);
+        if (result === 'duplicate') return res.json({ success: true, message: 'Already processed' });
+        if (result === 'quote_missing') return res.status(410).json({ error: 'Quote not found or expired' });
+        if (result === 'error') return res.status(500).json({ error: 'Failed to save pixels' });
       }
 
       res.json({ success: true });
@@ -665,6 +614,23 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
       res.status(500).json({ error: 'Failed to process webhook' });
     }
   });
+
+  // Reconcile loop: settle pending invoices whose webhook was missed (restart, delivery failure)
+  if (paymentsAdapter.pollPendingEvents) {
+    const reconcile = async () => {
+      try {
+        const events = await paymentsAdapter.pollPendingEvents!();
+        for (const evt of events) {
+          console.log(`Reconcile: settling missed payment ${String(evt.payment_id).slice(0, 16)}...`);
+          await handlePaymentCompleted(evt);
+        }
+      } catch (e) {
+        console.error('Reconcile error:', e);
+      }
+    };
+    setTimeout(reconcile, 15 * 1000).unref?.();   // first pass shortly after boot
+    setInterval(reconcile, 5 * 60 * 1000).unref?.(); // then every 5 minutes
+  }
 
 
 
@@ -824,7 +790,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
       }
 
       // Check for idempotency
-      if (processedPayments.has(paymentId)) {
+      if (database.isPaymentProcessed(paymentId)) {
         console.log(`Payment ${paymentId} already processed, skipping`);
         return res.json({ success: true, message: 'Already processed' });
       }
@@ -832,7 +798,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
       try {
         if (quoteId) {
           // Resolve server-side quote to simulate webhook behavior
-          const quote = bulkQuotes.get(quoteId)
+          const quote = database.getQuote(quoteId)
           if (!quote) {
             return res.status(410).json({ error: 'Quote not found or expired' })
           }
@@ -893,11 +859,10 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
           });
 
           // Mark payment as processed
-          processedPayments.add(paymentId);
-          processedPaymentsWithTimestamp.set(paymentId, Date.now());
+          database.markPaymentProcessed(paymentId);
 
           // Consume the quote to mimic real flow
-          bulkQuotes.delete(quoteId)
+          database.deleteQuote(quoteId)
 
           return res.json({ success: true, pixelsUpdated: savedPixels.length, paymentId, usedQuote: true });
         } else if (pixelUpdates && Array.isArray(pixelUpdates)) {
@@ -952,8 +917,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
           });
 
           // Mark payment as processed
-          processedPayments.add(paymentId);
-          processedPaymentsWithTimestamp.set(paymentId, Date.now());
+          database.markPaymentProcessed(paymentId);
 
           res.json({ success: true, pixelsUpdated: savedPixels.length, paymentId });
         } else {

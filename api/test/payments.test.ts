@@ -55,7 +55,7 @@ describe('NakaPayAdapter Webhook Verification', () => {
   });
 
   it('should verify valid webhook signature', () => {
-    const payload = { event: 'payment.completed', payment_id: 'test123' };
+    const payload = { event: 'payment.completed', payment_id: 'test123', timestamp: Math.floor(Date.now() / 1000), nonce: 'n-test-1' };
     const rawBody = JSON.stringify(payload);
     const expectedSignature = crypto
       .createHmac('sha256', secret)
