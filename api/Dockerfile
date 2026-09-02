@@ -1,16 +1,13 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
-# Install dependencies for native modules
+# Toolchain fallback si better-sqlite3 no tiene prebuild para la plataforma
 RUN apk add --no-cache python3 make g++
 
-# Copy package files
-COPY package.json ./
-
-# Install dependencies (ensure better-sqlite3 is installed)
-RUN npm install
-RUN npm install better-sqlite3
+# Lock exacto: npm ci con package-lock (reproducible, sin drift de registry)
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -18,8 +15,10 @@ COPY . .
 # Build TypeScript
 RUN npm run build
 
-# Expose port
+# Slim: sin devDeps en runtime
+RUN npm prune --omit=dev
+
+# Non-root (compose usa user 1000:1000)
 EXPOSE 3000
 
-# Start command
-CMD ["npm", "start"]
+CMD ["node", "dist/server.js"]
