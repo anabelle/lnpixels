@@ -19,7 +19,7 @@ A collaborative pixel art platform built with Lightning Network payments. Create
 - **Framework**: Node.js + Express + TypeScript
 - **Real-time**: Socket.IO for WebSocket connections
 - **Database**: SQLite with better-sqlite3 (requires entire folder mount for WAL support in Docker)
-- **Payments**: Lightning Network integration via Nakapay
+- **Payments**: Lightning Network integration via **Blink (Galoy)** — estado persiste en SQLite, reconcile cada 5min (NakaPay murió Ago-30)
 - **Development**: Hot reload with tsx
 
 ### Frontend (App)
@@ -33,7 +33,7 @@ A collaborative pixel art platform built with Lightning Network payments. Create
 
 ### Prerequisites
 - Node.js 22+ (recommended, see .nvmrc)
-- pnpm (recommended) or npm
+- npm (package-lock.json commiteado; pnpm también funciona)
 - Git
 
 ### Installation
@@ -352,12 +352,11 @@ curl -X POST "https://ln.pixel.xx.kg/api/invoices/bulk" \
 ```
 
 ### Payment Webhook
-Handle payment confirmations from the payments provider (Blink webhook, pull-verified against the API; NakaPay legacy).
+Handle payment confirmations from the payments provider.
 
-**Endpoint:** `POST /api/nakapay`
+**Endpoint (activo):** `POST /api/blink` — Blink webhook, pull-verified contra la API de Galoy como fuente de verdad (anti-forgery). Contrato completo: `api/README.md`.
 
-**Headers:**
-- `X-Nakapay-Signature`: Webhook signature for verification
+**Endpoint legacy (muerto):** `POST /api/nakapay` con `X-Nakapay-Signature` — NakaPay cesó Ago-30, se mantiene solo como referencia del formato:
 - `Content-Type`: application/json
 
 **Request Body:**
