@@ -2,6 +2,8 @@
 
 One-line: Buy pixels with Lightning. Paint an infinite canvas. Broadcast to Nostr. No accounts, no personal data.
 
+> **Status (2026-09-02):** historical design spec. Implemented with one deviation — payments run on **Blink (Galoy)** GraphQL instead of NakaPay (provider died platform-wide Aug 30, 2026); payment state persists in SQLite with a reconcile loop. Current contracts live in `api/README.md`.
+
 This document trims to the smallest lovable product, uses consistent terms, removes redundancy, and adds precise contracts so it can be implemented and tested quickly.
 
 ---
