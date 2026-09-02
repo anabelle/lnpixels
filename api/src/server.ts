@@ -63,7 +63,7 @@ app.use(express.json({
   limit: '5mb',
   verify: (req: any, res, buf) => {
     // Capture raw body for webhook signature verification
-    if (req.url === '/api/nakapay') {
+    if (req.url === '/api/nakapay' || req.url === '/api/blink') {
       req.rawBody = buf.toString();
     }
   }
