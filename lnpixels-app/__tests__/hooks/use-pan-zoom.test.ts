@@ -46,7 +46,7 @@ describe('usePanZoom', () => {
     expect(result.current).toHaveProperty('handleTouchStart')
     expect(result.current).toHaveProperty('handleTouchMove')
     expect(result.current).toHaveProperty('handleTouchEnd')
-    expect(result.current).toHaveProperty('isSpacePressed')
+    expect(result.current).toHaveProperty('isShiftPressed')
   })
 
   it('should handle mouse wheel zoom in', () => {

@@ -128,7 +128,7 @@ describe('Toolbar', () => {
   it('should call openSaveModal when save button is clicked', () => {
     mockUsePixelStore.mockReturnValue({
       ...defaultStoreState,
-      pixels: [{ x: 0, y: 0, color: '#000000' }], // Add a pixel so save button is enabled
+      pixels: [{ x: 0, y: 0, color: '#000000', isNew: true }], // isNew habilita el botón (disabled={newPixelCount === 0})
     })
 
     render(<Toolbar onToggleActivity={mockOnToggleActivity} />)
@@ -143,7 +143,7 @@ describe('Toolbar', () => {
   it('should call clearCanvas when clear button is clicked', () => {
     mockUsePixelStore.mockReturnValue({
       ...defaultStoreState,
-      pixels: [{ x: 0, y: 0, color: '#000000' }], // Add a pixel so clear button is enabled
+      pixels: [{ x: 0, y: 0, color: '#000000', isNew: true }],
     })
 
     render(<Toolbar onToggleActivity={mockOnToggleActivity} />)

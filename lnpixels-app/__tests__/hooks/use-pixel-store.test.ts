@@ -15,6 +15,19 @@ describe('usePixelStore', () => {
     vi.clearAllMocks()
     // default resolve to empty list to keep non-fetch tests simple
     ;(apiClient.getPixels as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([])
+    // Reset del singleton zustand (el estado persiste entre tests del archivo)
+    usePixelStore.setState({
+      pixels: [],
+      selectedColor: '#000000',
+      brushSize: 1,
+      zoom: 0.67,
+      panX: 0,
+      panY: 0,
+      toolMode: 'paint',
+      saveModal: { isOpen: false, totalPixels: 0, totalCost: 0 },
+      isLoading: false,
+      error: null,
+    })
   })
 
   it('should initialize with default state', () => {
@@ -23,7 +36,7 @@ describe('usePixelStore', () => {
     expect(result.current.pixels).toEqual([])
     expect(result.current.selectedColor).toBe('#000000')
     expect(result.current.brushSize).toBe(1)
-    expect(result.current.zoom).toBe(10)
+    expect(result.current.zoom).toBe(0.67)
     expect(result.current.panX).toBe(0)
     expect(result.current.panY).toBe(0)
     expect(result.current.toolMode).toBe('paint')
@@ -96,7 +109,7 @@ describe('usePixelStore', () => {
       result.current.resetView()
     })
 
-    expect(result.current.zoom).toBe(10)
+    expect(result.current.zoom).toBe(0.67)
     expect(result.current.panX).toBe(0)
     expect(result.current.panY).toBe(0)
   })
@@ -110,7 +123,9 @@ describe('usePixelStore', () => {
       result.current.addPixel(pixel)
     })
 
-    expect(result.current.pixels).toEqual([pixel])
+    expect(result.current.pixels).toHaveLength(1)
+    expect(result.current.pixels[0]).toMatchObject(pixel)
+    expect(result.current.pixels[0].isNew).toBe(true)
   })
 
   it('should replace pixel at same position', () => {
@@ -124,7 +139,9 @@ describe('usePixelStore', () => {
       result.current.addPixel(pixel2)
     })
 
-    expect(result.current.pixels).toEqual([pixel2])
+    expect(result.current.pixels).toHaveLength(1)
+    expect(result.current.pixels[0]).toMatchObject(pixel2)
+    expect(result.current.pixels[0].isNew).toBe(true)
   })
 
   it('should update pixels', () => {
@@ -214,14 +231,11 @@ describe('usePixelStore', () => {
   it('should open save modal with correct calculations', () => {
     const { result } = renderHook(() => usePixelStore())
 
-    const pixels = [
-      { x: 1, y: 1, color: '#000000' }, // 1 sat (black)
-      { x: 2, y: 2, color: '#ff0000' }, // 10 sats (color)
-      { x: 3, y: 3, color: '#00ff00', letter: 'A' }, // 100 sats (color + letter)
-    ]
-
+    // Solo los pixels nuevos (isNew) cuentan para el modal
     act(() => {
-      result.current.updatePixels(pixels)
+      result.current.addPixel({ x: 1, y: 1, color: '#000000' }) // 1 sat (black)
+      result.current.addPixel({ x: 2, y: 2, color: '#ff0000' }) // 10 sats (color)
+      result.current.addPixel({ x: 3, y: 3, color: '#00ff00', letter: 'A' }) // 100 sats (color + letter)
       result.current.openSaveModal()
     })
 
@@ -259,7 +273,7 @@ describe('usePixelStore', () => {
       await result.current.fetchPixels(0, 0, 10, 10)
     })
 
-    expect(result.current.pixels).toEqual(mockPixels)
+    expect(result.current.pixels).toEqual(mockPixels.map(p => ({ ...p, isNew: false })))
     expect(result.current.isLoading).toBe(false)
     expect(result.current.error).toBe(null)
   })
