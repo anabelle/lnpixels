@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Namespace } from 'socket.io';
-import { PaymentsAdapter, NakaPayAdapter, MockPaymentsAdapter } from './payments.js';
+import { PaymentsAdapter, NakaPayAdapter, MockPaymentsAdapter, createPaymentsAdapter } from './payments.js';
 import { price } from './pricing.js';
 import { getDatabase, PixelDatabase, Pixel } from './database.js';
 
@@ -46,10 +46,9 @@ function validateRectangleCoordinates(x1: number, y1: number, x2: number, y2: nu
 
 const router = Router();
 
-// Initialize payments adapter
-const paymentsAdapter: PaymentsAdapter = process.env.NAKAPAY_API_KEY
-  ? new NakaPayAdapter()
-  : new MockPaymentsAdapter();
+// Initialize payments adapter (provider-gated: Blink > NakaPay > Mock)
+const paymentsAdapter: PaymentsAdapter = createPaymentsAdapter();
+const isMockPayments = paymentsAdapter instanceof MockPaymentsAdapter;
 
 export function setupRoutes(io: Namespace, db?: PixelDatabase) {
   // Configurable limits (raise via env)
@@ -133,6 +132,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
       'POST /api/invoices/bulk': 'Create bulk invoice for rectangle purchase',
       'POST /api/invoices/pixels': 'Create bulk invoice for specific set of pixels',
       'POST /api/nakapay': 'NakaPay webhook',
+      'POST /api/blink': 'Blink webhook',
       'GET /api/activity': 'Get activity feed',
       'GET /api/verify/:eventId': 'Verify event'
     }
@@ -148,6 +148,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
       'POST /api/invoices/bulk': 'Create bulk invoice for rectangle purchase',
       'POST /api/invoices/pixels': 'Create bulk invoice for specific set of pixels',
       'POST /api/nakapay': 'NakaPay webhook',
+      'POST /api/blink': 'Blink webhook',
       'GET /api/activity': 'Get activity feed',
       'GET /api/verify/:eventId': 'Verify event'
     }
@@ -234,7 +235,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         payment_hash: invoice.payment_hash,
         amount: pixelPrice,
         id: invoice.id,
-        isMock: !process.env.NAKAPAY_API_KEY
+        isMock: isMockPayments
       });
     } catch (error) {
       console.error('Error creating invoice:', error);
@@ -345,7 +346,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         id: invoice.id,
         pixelCount: totalPixels,
         quoteId,
-        isMock: !process.env.NAKAPAY_API_KEY
+        isMock: isMockPayments
       });
     } catch (error) {
       console.error('Error creating bulk invoice:', error);
@@ -456,7 +457,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         id: invoice.id,
         pixelCount: pixels.length,
         quoteId,
-        isMock: !process.env.NAKAPAY_API_KEY
+        isMock: isMockPayments
       });
     } catch (error) {
       console.error('Error creating pixels invoice:', error);
@@ -464,10 +465,10 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
     }
   });
 
-  // POST /nakapay - Handle NakaPay webhooks
-  router.post('/nakapay', (req, res) => {
+  // POST /nakapay | /blink - Handle provider webhooks (NakaPay or Blink)
+  router.post(['/nakapay', '/blink'], (req, res) => {
     try {
-      const signature = req.headers['x-nakapay-signature'] as string;
+      const signature = (req.headers['x-nakapay-signature'] || req.headers['svix-signature']) as string;
       const rawBody = (req as any).rawBody;
 
       if (!rawBody) {
@@ -475,11 +476,19 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
       }
 
       // Verify webhook signature (includes replay protection)
-      if (!paymentsAdapter.verifyWebhook(rawBody, signature)) {
+      if (!paymentsAdapter.verifyWebhook(rawBody, signature, req.headers)) {
         return res.status(401).json({ error: 'Invalid signature or potential replay attack' });
       }
 
-      const payload = JSON.parse(rawBody);
+      // Blink normalizes via extractPaymentEvent; NakaPay/Mock use raw payload shape
+      const payload = paymentsAdapter.extractPaymentEvent
+        ? paymentsAdapter.extractPaymentEvent(rawBody)
+        : JSON.parse(rawBody);
+
+      if (!payload) {
+        // Non-payment event (e.g. Blink send./onchain. notifications) — ack and move on
+        return res.json({ success: true, ignored: true });
+      }
 
       // Handle payment completion
       if (payload.event === 'payment.completed') {
