@@ -215,7 +215,7 @@ describe('GET /api/activity', () => {
     const invoiceResponse = await request(app)
       .post('/api/invoices/bulk')
       .send({
-        x1: 0, y1: 0, x2: 1, y2: 0,
+        x1: 9000, y1: 9000, x2: 9001, y2: 9000,
         color: '#00ff00',
         letters: ['A', 'B']
       })
@@ -230,14 +230,14 @@ describe('GET /api/activity', () => {
       .send({
         event: 'payment.completed',
         payment_id: payment_hash,
-        amount: 20,
+        amount: 200,
         metadata: {
-          x1: 0, y1: 0, x2: 1, y2: 0,
+          x1: 9000, y1: 9000, x2: 9001, y2: 9000,
           color: '#00ff00',
           letters: ['A', 'B'],
           pixelUpdates: [
-            { x: 0, y: 0, color: '#00ff00', letter: 'A', price: 10 },
-            { x: 1, y: 0, color: '#00ff00', letter: 'B', price: 10 }
+            { x: 9000, y: 9000, color: '#00ff00', letter: 'A', price: 100 },
+            { x: 9001, y: 9000, color: '#00ff00', letter: 'B', price: 100 }
           ]
         }
       })
@@ -251,13 +251,13 @@ describe('GET /api/activity', () => {
     const activities = activityResponse.body.events;
     expect(activities).toContainEqual(
       expect.objectContaining({
-        x: 0, y: 0, color: '#00ff00', letter: 'A',
+        x: 9000, y: 9000, color: '#00ff00', letter: 'A',
         payment_hash: payment_hash, type: 'bulk_purchase'
       })
     );
     expect(activities).toContainEqual(
       expect.objectContaining({
-        x: 1, y: 0, color: '#00ff00', letter: 'B',
+        x: 9001, y: 9000, color: '#00ff00', letter: 'B',
         payment_hash: payment_hash, type: 'bulk_purchase'
       })
     );

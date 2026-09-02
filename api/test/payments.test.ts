@@ -133,8 +133,8 @@ describe('Webhook Integration Tests', () => {
       status: 'completed',
       timestamp: new Date().toISOString(),
       metadata: {
-        x: 1,
-        y: 2,
+        x: 9500,
+        y: 9500,
         color: '#ff0000',
         letter: 'A'
       }
@@ -182,8 +182,8 @@ describe('Webhook Integration Tests', () => {
       status: 'completed',
       timestamp: new Date().toISOString(),
       metadata: {
-        x: 1,
-        y: 2,
+        x: 9601,
+        y: 9601,
         color: '#ff0000',
         letter: 'A'
       }

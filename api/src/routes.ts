@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Namespace } from 'socket.io';
+import { timingSafeEqual } from 'crypto';
 import { PaymentsAdapter, NakaPayAdapter, MockPaymentsAdapter, createPaymentsAdapter, NormalizedPaymentEvent } from './payments.js';
 import { price } from './pricing.js';
 import { getDatabase, PixelDatabase, Pixel } from './database.js';
@@ -44,6 +45,15 @@ function validateRectangleCoordinates(x1: number, y1: number, x2: number, y2: nu
 const router = Router();
 
 export function setupRoutes(io: Namespace, db?: PixelDatabase) {
+  // Comparación timing-safe del Bearer token admin
+  const isAdminAuth = (req: any, token: string): boolean => {
+    const auth = req.headers.authorization ?? '';
+    const a = Buffer.from(auth);
+    const b = Buffer.from(`Bearer ${token}`);
+    return a.length === b.length && timingSafeEqual(a, b);
+  };
+
+
   // Configurable limits (raise via env)
   const MAX_BULK_PIXELS = Number(process.env.MAX_BULK_PIXELS || 1000)
   const MAX_RECT_PIXELS = Number(process.env.MAX_RECT_PIXELS || 1000)
@@ -114,8 +124,32 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
     }
   }));
 
+  // Rate limit simple in-memory para lecturas públicas (token bucket por IP).
+  // Sin deps externas; suficiente para frenar scraping del canvas público.
+  const rateBuckets = new Map<string, { tokens: number; last: number }>();
+  const RATE_CAPACITY = 30;   // burst
+  const RATE_REFILL_PER_SEC = 0.5;  // ~30 req/min sostenido
+  setInterval(() => { // GC de buckets inactivos (cada 10 min)
+    const cutoff = Date.now() - 30 * 60 * 1000;
+    for (const [k, b] of rateBuckets) if (b.last < cutoff) rateBuckets.delete(k);
+  }, 10 * 60 * 1000).unref?.();
+  const rateLimit = (req: any, res: any, next: any) => {
+    const key = req.ip || req.socket?.remoteAddress || 'unknown';
+    const now = Date.now();
+    const bucket = rateBuckets.get(key) ?? { tokens: RATE_CAPACITY, last: now };
+    bucket.tokens = Math.min(RATE_CAPACITY, bucket.tokens + ((now - bucket.last) / 1000) * RATE_REFILL_PER_SEC);
+    bucket.last = now;
+    if (bucket.tokens < 1) {
+      res.set('Retry-After', Math.ceil((1 - bucket.tokens) / RATE_REFILL_PER_SEC));
+      return res.status(429).json({ error: 'Too many requests' });
+    }
+    bucket.tokens -= 1;
+    rateBuckets.set(key, bucket);
+    next();
+  };
+
   // GET /pixels - returns pixels within specified rectangle
-  router.get('/pixels', (req, res) => {
+  router.get('/pixels', rateLimit, (req, res) => {
     const { x1, y1, x2, y2 } = req.query;
 
     // Validate parameters
@@ -427,7 +461,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
   // Shared payment-completion processing (webhook + reconcile). Persists pixels,
   // activity, quote consumption and the idempotency marker atomically; emits after commit.
-  const handlePaymentCompleted = async (payload: NormalizedPaymentEvent): Promise<'processed' | 'duplicate' | 'quote_missing' | 'error'> => {
+  const handlePaymentCompleted = async (payload: NormalizedPaymentEvent): Promise<'processed' | 'duplicate' | 'quote_missing' | 'price_conflict' | 'error'> => {
     const paymentId = payload.payment_id;
 
     // Idempotency (survives restarts — SQLite-backed)
@@ -446,11 +480,27 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
       return result;
     });
 
+    // TOCTOU guard: recompute what these pixels cost NOW. If another buyer raised
+    // lastPrice between quote/invoice and settlement, the stale price must not win.
+    const requiredNow = (updates: Array<{ x: number; y: number; color?: string; letter?: string | null }>): number =>
+      updates.reduce((sum, u) => {
+        const existing = database.getPixel(u.x, u.y);
+        return sum + price({ color: u.color || '#000000', letter: u.letter ?? null, lastPrice: existing ? existing.sats : null });
+      }, 0);
+    const paidAmount = (): number => Number(payload.amount) || 0;
+    const recordConflict = (required: number) => {
+      database.runInTransaction(() => {
+        database.recordPaymentIncident(paymentId, 'price_conflict', { metadata, amount: payload.amount, requiredNow: required });
+        if (payload.pending_hash) database.deletePendingInvoice(payload.pending_hash);
+      });
+      console.error(`PAYMENT INCIDENT price_conflict: payment=${String(paymentId).slice(0, 20)} paid=${paidAmount()} requiredNow=${required} — stale quote, reconcile manually (/admin/restore)`);
+    };
+
     try {
       if (metadata.quoteId) {
         // Bulk payment resolved via server-side quote
         const quote = database.getQuote(metadata.quoteId);
-        if (!quote) {
+        if (!quote || Date.now() - quote.createdAt > QUOTE_TTL) {
           // Payment verified but quote expired (paid after TTL): money is in the wallet,
           // pixels can't be delivered automatically. Persist an incident for manual
           // reconciliation and consume the pending entry so retries stop scratching a 410.
@@ -460,6 +510,14 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
           });
           console.error(`PAYMENT INCIDENT quote_missing: payment=${String(paymentId).slice(0, 20)} amount=${payload.amount} — paid after quote TTL, deliver pixels manually (/admin/restore)`);
           return 'quote_missing';
+        }
+
+        // TOCTOU: si el pago no cubre el precio vigente (otro comprador subió lastPrice
+        // tras el quote), no aplicar los pixels al precio viejo — incidente manual
+        const required = requiredNow(quote.pixelUpdates);
+        if (paidAmount() < required) {
+          recordConflict(required);
+          return 'price_conflict';
         }
 
         const timestamp = Date.now();
@@ -511,7 +569,12 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
           io.emit('activity.append', summaryActivity);
         }
       } else if (metadata.pixelUpdates) {
-        // Backward compatibility: older flows that still send pixelUpdates in metadata
+        // Backward Compatibility: older flows that still send pixelUpdates in metadata
+        const required = requiredNow(metadata.pixelUpdates);
+        if (paidAmount() < required) {
+          recordConflict(required);
+          return 'price_conflict';
+        }
         const timestamp = Date.now();
         const activityRecords: any[] = [];
         const savedPixels = tx(() => {
@@ -548,6 +611,11 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         }
       } else {
         // Single pixel payment - use database upsert
+        const required = requiredNow([{ x: metadata.x, y: metadata.y, color: metadata.color, letter: metadata.letter }]);
+        if (paidAmount() < required) {
+          recordConflict(required);
+          return 'price_conflict';
+        }
         const timestamp = Date.now();
         let activityRecord: any;
         const savedPixel = tx(() => {
@@ -621,6 +689,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         if (result === 'duplicate') return res.json({ success: true, message: 'Already processed' });
         // quote_missing: incident recorded server-side; ack 200 so the provider stops retrying
         if (result === 'quote_missing') return res.json({ success: true, incident: 'quote_missing' });
+        if (result === 'price_conflict') return res.json({ success: true, incident: 'price_conflict' });
         if (result === 'error') return res.status(500).json({ error: 'Failed to save pixels' });
       }
 
@@ -727,7 +796,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
   // Admin: list payment incidents (money received without delivery — needs manual action)
   router.get('/admin/incidents', (req, res) => {
     const token = process.env.ADMIN_TOKEN;
-    if (!token || req.headers.authorization !== `Bearer ${token}`) {
+    if (!token || !isAdminAuth(req, token)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     res.json({ incidents: database.listPaymentIncidents(100) });
@@ -736,7 +805,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
   // Admin restore endpoint
   router.post('/admin/restore', async (req, res) => {
     const token = process.env.ADMIN_TOKEN;
-    if (!token || req.headers.authorization !== `Bearer ${token}`) {
+    if (!token || !isAdminAuth(req, token)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
     try {
