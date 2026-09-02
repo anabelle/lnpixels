@@ -15,22 +15,22 @@
   "dependencies": {
     "better-sqlite3": "^13.0.3",
     "dotenv": "^17.2.1",
-    "eslint": "^9.33.0",
     "express": "^5.1.0",
     "nakapay-sdk": "^0.1.4",
     "node-fetch": "^3.3.2",
     "nostr-tools": "^2.16.2",
     "socket.io": "^4.8.1",
-    "supertest": "^7.1.4",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.20.4",
-    "vitest": "^3.2.4"
+    "tsx": "^4.20.4"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.3",
     "@types/node": "^24.3.0",
     "socket.io-client": "^4.8.1",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4",
+    "eslint": "^9.33.0",
+    "supertest": "^7.1.4",
+    "ts-node": "^10.9.2"
   }
 }
