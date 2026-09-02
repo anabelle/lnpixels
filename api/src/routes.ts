@@ -466,7 +466,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
   });
 
   // POST /nakapay | /blink - Handle provider webhooks (NakaPay or Blink)
-  router.post(['/nakapay', '/blink'], (req, res) => {
+  router.post(['/nakapay', '/blink'], async (req, res) => {
     try {
       const signature = (req.headers['x-nakapay-signature'] || req.headers['svix-signature']) as string;
       const rawBody = (req as any).rawBody;
@@ -480,9 +480,9 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         return res.status(401).json({ error: 'Invalid signature or potential replay attack' });
       }
 
-      // Blink normalizes via extractPaymentEvent; NakaPay/Mock use raw payload shape
+      // Blink normalizes (and pull-verifies) via extractPaymentEvent; NakaPay/Mock use raw payload shape
       const payload = paymentsAdapter.extractPaymentEvent
-        ? paymentsAdapter.extractPaymentEvent(rawBody)
+        ? await paymentsAdapter.extractPaymentEvent(rawBody)
         : JSON.parse(rawBody);
 
       if (!payload) {

@@ -16,8 +16,8 @@ export interface PaymentsAdapter {
     payment_hash: string;
   }>;
   verifyWebhook(rawBody: string, signature: string, headers?: Record<string, string | string[] | undefined>): boolean;
-  /** Normalize a provider webhook payload; null = ignore */
-  extractPaymentEvent?(rawBody: string): NormalizedPaymentEvent | null;
+  /** Normalize a provider webhook payload; null = ignore. May verify server-side (pull). */
+  extractPaymentEvent?(rawBody: string): Promise<NormalizedPaymentEvent | null>;
 }
 
 export class NakaPayAdapter implements PaymentsAdapter {
@@ -151,6 +151,7 @@ export class BlinkAdapter implements PaymentsAdapter {
   private walletId: string | null = null;
   // paymentHash → invoice context awaiting webhook
   private pendingByHash = new Map<string, { metadata: any; amount: number; description: string; createdAt: number }>();
+  private warnedNoSecret = false;
   private readonly PENDING_MAX_AGE = 24 * 3600 * 1000; // invoices live far less; safety cap
   private readonly PENDING_MAX_SIZE = 5000;
 
@@ -244,8 +245,13 @@ export class BlinkAdapter implements PaymentsAdapter {
   verifyWebhook(rawBody: string, signature: string, headers?: Record<string, string | string[] | undefined>): boolean {
     const secret = process.env.BLINK_WEBHOOK_SECRET;
     if (!secret) {
-      console.error('BLINK_WEBHOOK_SECRET environment variable is required');
-      return false;
+      // Blink callback endpoints may be unsigned (no whsec exposed). Security then
+      // relies on the server-side pull verification in extractPaymentEvent().
+      if (!this.warnedNoSecret) {
+        this.warnedNoSecret = true;
+        console.warn('Blink webhook: BLINK_WEBHOOK_SECRET unset — relying on API pull-verification only');
+      }
+      return true;
     }
     const id = headers?.['svix-id'];
     const ts = Number(headers?.['svix-timestamp']);
@@ -273,7 +279,27 @@ export class BlinkAdapter implements PaymentsAdapter {
       });
   }
 
-  extractPaymentEvent(rawBody: string): NormalizedPaymentEvent | null {
+  /** Server-side truth check: the payment hash must be a SUCCESS RECEIVE in recent account transactions */
+  private async verifySettled(paymentHash: string, expectedAmount?: number): Promise<boolean> {
+    try {
+      const data = await this.graphql(
+        `query T($first: Int) { me { defaultAccount { transactions(first: $first) { edges { node {
+          direction status settlementAmount
+          initiationVia { ... on InitiationViaLn { paymentHash } }
+        } } } } } }`,
+        { first: 20 }
+      );
+      const nodes: any[] = data?.me?.defaultAccount?.transactions?.edges?.map((e: any) => e.node) || [];
+      const tx = nodes.find((n) => n.initiationVia?.paymentHash === paymentHash);
+      return !!tx && tx.status === 'SUCCESS' && tx.direction === 'RECEIVE'
+        && (expectedAmount === undefined || tx.settlementAmount === expectedAmount);
+    } catch (err: any) {
+      console.error(`Blink pull-verify failed: ${err.message}`);
+      return false;
+    }
+  }
+
+  async extractPaymentEvent(rawBody: string): Promise<NormalizedPaymentEvent | null> {
     let p: any;
     try {
       p = JSON.parse(rawBody);
@@ -303,6 +329,11 @@ export class BlinkAdapter implements PaymentsAdapter {
 
     if (!entry) {
       console.warn(`Blink webhook: no pending invoice for hash=${hash?.slice(0, 16)}...`);
+      return null;
+    }
+    // Anti-forgery: confirm against account state via API before accepting
+    if (hash && !(await this.verifySettled(hash, entry.amount))) {
+      console.warn(`Blink webhook: pull-verification FAILED for hash=${hash.slice(0, 16)}... — ignoring`);
       return null;
     }
     if (hash) this.pendingByHash.delete(hash);
