@@ -75,7 +75,7 @@ describe('BlinkAdapter', () => {
         initiationVia: { type: 'lightning', paymentHash: 'abc123hash' }
       }
     }));
-    expect(evt).toMatchObject({ event: 'payment.completed', payment_id: 'abc123hash', amount: 100, metadata: { x: 1, y: 2 } });
+    expect(evt).toMatchObject({ event: 'payment.completed', payment_id: 'abc123hash', amount: 100, metadata: { x: 1, y: 2 }, pending_hash: 'abc123hash' });
   });
 
   it('webhook is ignored when pull-verification fails (forged payload)', async () => {
@@ -169,7 +169,7 @@ describe('BlinkAdapter', () => {
       expect(evt).toMatchObject({ event: 'payment.completed', metadata: { x: 3, y: 4 } });
     });
 
-    it('consumes pending entry after first webhook (dedupe by hash exhaustion)', async () => {
+    it('returns pending_hash and leaves consumption to the caller (retry-safe)', async () => {
       process.env.BLINK_WALLET_ID = 'w1';
       fetchMock.mockResolvedValue(graphqlResponse({ lnInvoiceCreate: { invoice: {
         paymentRequest: 'lnbc1n1y', paymentHash: 'ih2', satoshis: 5
@@ -180,9 +180,13 @@ describe('BlinkAdapter', () => {
         eventType: 'receive.lightning',
         transaction: { status: 'success', settlementAmount: 5, initiationVia: { paymentHash: 'ih2' } }
       });
-      fetchMock.mockResolvedValueOnce(graphqlResponse({ lnInvoicePaymentStatus: { errors: [], status: 'PAID' } }));
-      expect(await adapter.extractPaymentEvent!(payload)).not.toBeNull();
-      expect(await adapter.extractPaymentEvent!(payload)).toBeNull(); // consumed
+      fetchMock.mockResolvedValue(graphqlResponse({ lnInvoicePaymentStatus: { errors: [], status: 'PAID' } }));
+      const first = await adapter.extractPaymentEvent!(payload);
+      expect(first).toMatchObject({ payment_id: 'ih2', pending_hash: 'ih2' });
+      // Not consumed by the adapter: a re-delivery before the caller's transaction
+      // still extracts (idempotency then lives in processed_payments)
+      const second = await adapter.extractPaymentEvent!(payload);
+      expect(second).toMatchObject({ payment_id: 'ih2', pending_hash: 'ih2' });
     });
   });
 
@@ -258,10 +262,12 @@ describe('BlinkAdapter', () => {
       fetchMock.mockResolvedValueOnce(graphqlResponse({ lnInvoicePaymentStatus: { errors: [], status: 'PAID' } }));
       const events = await b.pollPendingEvents!();
       expect(events).toHaveLength(1);
-      expect(events[0]).toMatchObject({ event: 'payment.completed', payment_id: 'rec1', amount: 44, metadata: { quoteId: 'q1' } });
+      expect(events[0]).toMatchObject({ event: 'payment.completed', payment_id: 'rec1', amount: 44, metadata: { quoteId: 'q1' }, pending_hash: 'rec1' });
 
-      // Consumed: second poll finds nothing (no fetch happens)
-      expect(await b.pollPendingEvents!()).toHaveLength(0);
+      // Consumption is the caller's job (routes consumes inside its transaction),
+      // so a fresh poll of the still-pending invoice yields the event again
+      fetchMock.mockResolvedValueOnce(graphqlResponse({ lnInvoicePaymentStatus: { errors: [], status: 'PAID' } }));
+      expect(await b.pollPendingEvents!()).toHaveLength(1);
       db.close();
     });
 
@@ -316,6 +322,17 @@ describe('BlinkAdapter', () => {
       })).toThrow('boom');
       // Quote deletion rolled back
       expect(db.getQuote('qt')).toBeDefined();
+      db.close();
+    });
+
+    it('payment incidents roundtrip', () => {
+      const db = createTestDatabase(':memory:');
+      db.recordPaymentIncident('pay1', 'quote_missing', { amount: 500, metadata: { quoteId: 'q_x' } });
+      db.recordPaymentIncident('pay2', 'quote_missing', { amount: 21 });
+      const incidents = db.listPaymentIncidents(10);
+      expect(incidents).toHaveLength(2);
+      const pay1 = incidents.find(i => i.payment_id === 'pay1')!;
+      expect(pay1).toMatchObject({ kind: 'quote_missing', details: { amount: 500, metadata: { quoteId: 'q_x' } } });
       db.close();
     });
   });

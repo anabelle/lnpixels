@@ -432,24 +432,39 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
     // Idempotency (survives restarts — SQLite-backed)
     if (database.isPaymentProcessed(paymentId)) {
+      if (payload.pending_hash) database.deletePendingInvoice(payload.pending_hash); // stray pending after re-delivery
       console.log(`Payment ${paymentId} already processed, skipping`);
       return 'duplicate';
     }
 
     const metadata = payload.metadata;
+    // Consume the pending-invoice entry atomically with the outcome (retry-safe:
+    // a failed transaction leaves it in place so provider retries can still settle)
+    const tx = <T>(fn: () => T): T => database.runInTransaction(() => {
+      const result = fn();
+      if (payload.pending_hash) database.deletePendingInvoice(payload.pending_hash);
+      return result;
+    });
 
     try {
       if (metadata.quoteId) {
         // Bulk payment resolved via server-side quote
         const quote = database.getQuote(metadata.quoteId);
         if (!quote) {
-          console.error('Quote not found or expired:', metadata.quoteId);
+          // Payment verified but quote expired (paid after TTL): money is in the wallet,
+          // pixels can't be delivered automatically. Persist an incident for manual
+          // reconciliation and consume the pending entry so retries stop scratching a 410.
+          database.runInTransaction(() => {
+            database.recordPaymentIncident(paymentId, 'quote_missing', { metadata, amount: payload.amount });
+            if (payload.pending_hash) database.deletePendingInvoice(payload.pending_hash);
+          });
+          console.error(`PAYMENT INCIDENT quote_missing: payment=${String(paymentId).slice(0, 20)} amount=${payload.amount} — paid after quote TTL, deliver pixels manually (/admin/restore)`);
           return 'quote_missing';
         }
 
         const timestamp = Date.now();
         const activityRecords: any[] = [];
-        const savedPixels = database.runInTransaction(() => {
+        const savedPixels = tx(() => {
           const pixelData = quote.pixelUpdates.map((update: any) => ({
             x: update.x,
             y: update.y,
@@ -499,7 +514,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         // Backward compatibility: older flows that still send pixelUpdates in metadata
         const timestamp = Date.now();
         const activityRecords: any[] = [];
-        const savedPixels = database.runInTransaction(() => {
+        const savedPixels = tx(() => {
           const pixelData = metadata.pixelUpdates.map((update: any) => ({
             x: update.x,
             y: update.y,
@@ -535,7 +550,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
         // Single pixel payment - use database upsert
         const timestamp = Date.now();
         let activityRecord: any;
-        const savedPixel = database.runInTransaction(() => {
+        const savedPixel = tx(() => {
           const pixel = database.upsertPixel({
             x: metadata.x,
             y: metadata.y,
@@ -604,7 +619,8 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
       if (payload.event === 'payment.completed') {
         const result = await handlePaymentCompleted(payload);
         if (result === 'duplicate') return res.json({ success: true, message: 'Already processed' });
-        if (result === 'quote_missing') return res.status(410).json({ error: 'Quote not found or expired' });
+        // quote_missing: incident recorded server-side; ack 200 so the provider stops retrying
+        if (result === 'quote_missing') return res.json({ success: true, incident: 'quote_missing' });
         if (result === 'error') return res.status(500).json({ error: 'Failed to save pixels' });
       }
 
@@ -706,6 +722,15 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
       console.error('Error fetching stats:', error);
       res.status(500).json({ error: 'Failed to fetch stats' });
     }
+  });
+
+  // Admin: list payment incidents (money received without delivery — needs manual action)
+  router.get('/admin/incidents', (req, res) => {
+    const token = process.env.ADMIN_TOKEN;
+    if (!token || req.headers.authorization !== `Bearer ${token}`) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    res.json({ incidents: database.listPaymentIncidents(100) });
   });
 
   // Admin restore endpoint

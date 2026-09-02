@@ -58,6 +58,13 @@ const CREATE_PAYMENT_STATE_TABLES = `
     data TEXT NOT NULL,
     created_at INTEGER NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS payment_incidents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    payment_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    details TEXT,
+    created_at INTEGER NOT NULL
+  );
   CREATE INDEX IF NOT EXISTS idx_pending_created ON pending_invoices(created_at);
   CREATE INDEX IF NOT EXISTS idx_processed_created ON processed_payments(created_at);
   CREATE INDEX IF NOT EXISTS idx_quotes_created ON bulk_quotes(created_at);
@@ -374,10 +381,23 @@ export class PixelDatabase implements PendingInvoiceStore {
     return result.changes;
   }
 
-  // Create database backup
-  createBackup(backupPath?: string): string {
+  // --- Payment incidents (money received, pixels not deliverable — needs manual action) ---
+
+  recordPaymentIncident(paymentId: string, kind: string, details: any): void {
+    this.db.prepare('INSERT INTO payment_incidents (payment_id, kind, details, created_at) VALUES (?, ?, ?, ?)')
+      .run(paymentId, kind, JSON.stringify(details ?? {}), Date.now());
+  }
+
+  listPaymentIncidents(limit = 50): Array<{ id: number; payment_id: string; kind: string; details: any; created_at: number }> {
+    const rows = this.db.prepare('SELECT * FROM payment_incidents ORDER BY created_at DESC LIMIT ?').all(limit) as any[];
+    return rows.map((r) => ({ id: r.id, payment_id: r.payment_id, kind: r.kind, details: JSON.parse(r.details), created_at: r.created_at }));
+  }
+
+  // Create database backup (online backup API — WAL-safe, unlike a raw file copy
+  // which would miss everything still living in the -wal file)
+  async createBackup(backupPath?: string): Promise<string> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupDir = process.env.BACKUP_DIR || '../backups';
+    const backupDir = process.env.BACKUP_DIR || './backups';
 
     // Ensure backup directory exists
     if (!fs.existsSync(backupDir)) {
@@ -389,9 +409,7 @@ export class PixelDatabase implements PendingInvoiceStore {
     const defaultPath = path.join(backupDir, `pixels_backup_${timestamp}_${randomSuffix}.db`);
     const finalPath = backupPath || defaultPath;
 
-    // For SQLite, we can use the backup API or just copy the file
-    // Since better-sqlite3 doesn't have built-in backup, we'll use filesystem copy
-    fs.copyFileSync(this.dbPath, finalPath);
+    await this.db.backup(finalPath);
 
     // Set secure permissions (read/write for owner only)
     try {

@@ -7,6 +7,8 @@ export interface NormalizedPaymentEvent {
   payment_id: string;
   metadata?: any;
   amount?: number;
+  /** Pipeline-internal: pending-invoice hash to consume atomically once the payment is durably processed */
+  pending_hash?: string;
 }
 
 export interface PaymentsAdapter {
@@ -435,13 +437,14 @@ export class BlinkAdapter implements PaymentsAdapter {
       console.warn(`Blink webhook: pull-verification FAILED for ${hash ? 'hash=' + hash.slice(0, 16) : 'tx=' + String(tx.id).slice(0, 16)} — ignoring`);
       return null;
     }
-    if (matchHash) this.store.deletePendingInvoice(matchHash);
+    // Pending entry is consumed by the caller inside its SQLite transaction (retry-safe)
 
     return {
       event: 'payment.completed',
       payment_id: hash || tx.id,
       metadata: entry.metadata,
-      amount: tx.settlementAmount
+      amount: tx.settlementAmount,
+      pending_hash: matchHash
     };
   }
 
@@ -464,8 +467,8 @@ export class BlinkAdapter implements PaymentsAdapter {
     for (const { paymentHash, entry } of pending) {
       if (entry.paymentRequest) {
         if (await this.invoicePaid(entry.paymentRequest) === true) {
-          this.store.deletePendingInvoice(paymentHash);
-          events.push({ event: 'payment.completed', payment_id: paymentHash, metadata: entry.metadata, amount: entry.amount });
+          // Pending entry is consumed by the caller inside its SQLite transaction
+          events.push({ event: 'payment.completed', payment_id: paymentHash, metadata: entry.metadata, amount: entry.amount, pending_hash: paymentHash });
         }
         continue;
       }
@@ -476,8 +479,7 @@ export class BlinkAdapter implements PaymentsAdapter {
         && n.initiationVia?.paymentHash === paymentHash && n.settlementAmount === entry.amount
       );
       if (tx) {
-        this.store.deletePendingInvoice(paymentHash);
-        events.push({ event: 'payment.completed', payment_id: paymentHash, metadata: entry.metadata, amount: entry.amount });
+        events.push({ event: 'payment.completed', payment_id: paymentHash, metadata: entry.metadata, amount: entry.amount, pending_hash: paymentHash });
       }
     }
     if (events.length > 0) {
