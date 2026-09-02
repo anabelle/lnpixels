@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Namespace } from 'socket.io';
 import { timingSafeEqual } from 'crypto';
+import { deflateSync } from 'zlib';
 import { PaymentsAdapter, NakaPayAdapter, MockPaymentsAdapter, createPaymentsAdapter, NormalizedPaymentEvent } from './payments.js';
 import { price } from './pricing.js';
 import { getDatabase, PixelDatabase, Pixel } from './database.js';
@@ -790,6 +791,105 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
     } catch (error) {
       console.error('Error fetching stats:', error);
       res.status(500).json({ error: 'Failed to fetch stats' });
+    }
+  });
+
+  // ── Canvas PNG render — "state of the art" snapshot ──────────────
+  // The grid is infinite (any integer coords, negatives included). The render
+  // auto-frames the bounding box of everything ever painted. No deps: manual
+  // PNG encoding (RGB8, filter 0) + zlib deflate.
+  const PNG_CRC_TABLE = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+  function pngCrc(buf: Buffer): number {
+    let c = 0xffffffff;
+    for (let i = 0; i < buf.length; i++) c = PNG_CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+  function pngChunk(type: string, data: Buffer): Buffer {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length, 0);
+    const typeBuf = Buffer.from(type, 'ascii');
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(pngCrc(Buffer.concat([typeBuf, data])), 0);
+    return Buffer.concat([len, typeBuf, data, crc]);
+  }
+  function renderHexToRgb(hex: string): [number, number, number] {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0, 2), 16) || 0, parseInt(h.slice(2, 4), 16) || 0, parseInt(h.slice(4, 6), 16) || 0];
+  }
+  const RENDER_BG: [number, number, number] = [13, 16, 23]; // #0d1017
+  const RENDER_MAX_SPAN = 4096; // safety clamp for absurd futures
+  let renderCache: { at: number; buffer: Buffer } | null = null;
+
+  router.get('/render.png', (req, res) => {
+    try {
+      if (renderCache && Date.now() - renderCache.at < 60_000) {
+        res.set('Content-Type', 'image/png');
+        res.set('Cache-Control', 'public, max-age=60');
+        return res.send(renderCache.buffer);
+      }
+
+      const all = database.getAllPixels();
+      let x1 = 0, y1 = 0, x2 = 0, y2 = 0;
+      if (all.length > 0) {
+        let minx = Infinity, maxx = -Infinity, miny = Infinity, maxy = -Infinity;
+        for (const p of all) {
+          if (p.x < minx) minx = p.x;
+          if (p.x > maxx) maxx = p.x;
+          if (p.y < miny) miny = p.y;
+          if (p.y > maxy) maxy = p.y;
+        }
+        const pad = 4;
+        x1 = minx - pad; y1 = miny - pad; x2 = maxx + pad; y2 = maxy + pad;
+        // Clamp span around the centroid if the art ever outgrows RENDER_MAX_SPAN
+        const cx = Math.round((minx + maxx) / 2), cy = Math.round((miny + maxy) / 2);
+        if (x2 - x1 + 1 > RENDER_MAX_SPAN) { x1 = cx - Math.floor(RENDER_MAX_SPAN / 2); x2 = x1 + RENDER_MAX_SPAN - 1; }
+        if (y2 - y1 + 1 > RENDER_MAX_SPAN) { y1 = cy - Math.floor(RENDER_MAX_SPAN / 2); y2 = y1 + RENDER_MAX_SPAN - 1; }
+      }
+
+      const W = x2 - x1 + 1, H = y2 - y1 + 1;
+      const rgb = Buffer.alloc(W * H * 3);
+      for (let i = 0; i < W * H; i++) {
+        rgb[i * 3] = RENDER_BG[0]; rgb[i * 3 + 1] = RENDER_BG[1]; rgb[i * 3 + 2] = RENDER_BG[2];
+      }
+      for (const p of all) {
+        if (p.x < x1 || p.x > x2 || p.y < y1 || p.y > y2) continue;
+        const [r, g, b] = renderHexToRgb(p.color);
+        const i = ((p.y - y1) * W + (p.x - x1)) * 3;
+        rgb[i] = r; rgb[i + 1] = g; rgb[i + 2] = b;
+      }
+
+      const stride = W * 3 + 1;
+      const raw = Buffer.alloc(stride * H); // filter byte 0 per row (already zeroed)
+      for (let row = 0; row < H; row++) {
+        rgb.copy(raw, row * stride + 1, row * W * 3, (row + 1) * W * 3);
+      }
+      const ihdr = Buffer.alloc(13);
+      ihdr.writeUInt32BE(W, 0);
+      ihdr.writeUInt32BE(H, 4);
+      ihdr[8] = 8; // bit depth
+      ihdr[9] = 2; // color type RGB
+      const png = Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        pngChunk('IHDR', ihdr),
+        pngChunk('IDAT', deflateSync(raw, { level: 6 })),
+        pngChunk('IEND', Buffer.alloc(0)),
+      ]);
+
+      renderCache = { at: Date.now(), buffer: png };
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'public, max-age=60');
+      return res.send(png);
+    } catch (error: any) {
+      console.error('Error rendering canvas PNG:', error.message);
+      return res.status(500).json({ error: 'Failed to render canvas' });
     }
   });
 
