@@ -280,7 +280,7 @@ export class BlinkAdapter implements PaymentsAdapter {
   }
 
   /** Server-side truth check: the payment hash must be a SUCCESS RECEIVE in recent account transactions */
-  private async verifySettled(paymentHash: string, expectedAmount?: number): Promise<boolean> {
+  private async verifySettled(paymentHash?: string, expectedAmount?: number, txId?: string): Promise<boolean> {
     try {
       const data = await this.graphql(
         `query T($first: Int) { me { defaultAccount { transactions(first: $first) { edges { node {
@@ -290,7 +290,7 @@ export class BlinkAdapter implements PaymentsAdapter {
         { first: 20 }
       );
       const nodes: any[] = data?.me?.defaultAccount?.transactions?.edges?.map((e: any) => e.node) || [];
-      const tx = nodes.find((n) => n.initiationVia?.paymentHash === paymentHash);
+      const tx = nodes.find((n) => (paymentHash && n.initiationVia?.paymentHash === paymentHash) || (txId && n.id === txId));
       return !!tx && tx.status === 'SUCCESS' && tx.direction === 'RECEIVE'
         && (expectedAmount === undefined || tx.settlementAmount === expectedAmount);
     } catch (err: any) {
@@ -332,8 +332,12 @@ export class BlinkAdapter implements PaymentsAdapter {
       return null;
     }
     // Anti-forgery: confirm against account state via API before accepting
-    if (hash && !(await this.verifySettled(hash, entry.amount))) {
-      console.warn(`Blink webhook: pull-verification FAILED for hash=${hash.slice(0, 16)}... — ignoring`);
+    // (intraledger has no payment hash — verify by Blink transaction id)
+    const verified = hash
+      ? await this.verifySettled(hash, entry.amount)
+      : await this.verifySettled(undefined, entry.amount, tx.id);
+    if (!verified) {
+      console.warn(`Blink webhook: pull-verification FAILED for ${hash ? 'hash=' + hash.slice(0, 16) : 'tx=' + String(tx.id).slice(0, 16)} — ignoring`);
       return null;
     }
     if (hash) this.pendingByHash.delete(hash);

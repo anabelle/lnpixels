@@ -160,6 +160,9 @@ describe('BlinkAdapter', () => {
       }, errors: [] } }));
       await adapter.createInvoice(21, 'Pixel purchase: (3, 4)', { x: 3, y: 4 });
 
+      fetchMock.mockResolvedValueOnce(graphqlResponse({ me: { defaultAccount: { transactions: { edges: [
+        { node: { id: 'tx9', direction: 'RECEIVE', status: 'SUCCESS', settlementAmount: 21, initiationVia: { type: 'intraledger' } } }
+      ] } } } }));
       const evt = await adapter.extractPaymentEvent!(JSON.stringify({
         eventType: 'receive.intraledger',
         transaction: { id: 'tx9', status: 'success', settlementAmount: 21, memo: 'Pixel purchase: (3, 4)', initiationVia: { type: 'intraledger' } }

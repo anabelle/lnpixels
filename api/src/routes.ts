@@ -744,6 +744,10 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
 
   // Admin restore endpoint
   router.post('/admin/restore', async (req, res) => {
+    const token = process.env.ADMIN_TOKEN;
+    if (!token || req.headers.authorization !== `Bearer ${token}`) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     try {
       const { pixels } = req.body;
       if (!Array.isArray(pixels)) return res.status(400).json({ error: 'pixels array required' });
@@ -774,7 +778,7 @@ export function setupRoutes(io: Namespace, db?: PixelDatabase) {
   });
 
   // Test endpoint for triggering pixel updates (only in development/test)
-  if (process.env.NODE_ENV !== 'production') {
+  if (process.env.ENABLE_TEST_ENDPOINTS === '1') {
     router.post('/test-update', (req, res) => {
       const testPixel = {
         x: 10,
