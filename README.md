@@ -5,22 +5,7 @@ A collaborative pixel art platform built with Lightning Network payments. Create
 ## 🌟 Features
 
 - **Collaborative Canvas**: Real-time pixel art creation with multiple users
-- **Lightning Network Integration**: Pay-per-pixel with instant Bitcoin payments via NakaPay
-- **QR Code Payments**: Scan QR codes with any Lightning wallet
-- **WebSocket Real-time Updates**: Live canvas updates for all connected users
-- **Professional Payment UI**: Polished modal with invoice display and error handling
-- **Responsive Design**: Works on desktop and mobile devices
-- **Development Ready**: Hot reload, TypeScript, and modern tooling
-- **Comprehensive Testing**: TDD approach with extensive test coverage
-
-# LNPixels 🎨
-
-A collaborative pixel art platform built with Lightning Network payments. Create, share, and monetize pixel art on a decentralized canvas.
-
-## 🌟 Features
-
-- **Collaborative Canvas**: Real-time pixel art creation with multiple users
-- **Lightning Network Integration**: Pay-per-pixel with instant Bitcoin payments via NakaPay
+- **Lightning Network Integration**: Pay-per-pixel with instant Bitcoin payments via Blink (Galoy)
 - **QR Code Payments**: Scan QR codes with any Lightning wallet
 - **WebSocket Real-time Updates**: Live canvas updates for all connected users
 - **Professional Payment UI**: Polished modal with invoice display and error handling
@@ -367,7 +352,7 @@ curl -X POST "https://ln.pixel.xx.kg/api/invoices/bulk" \
 ```
 
 ### Payment Webhook
-Handle payment confirmations from NakaPay Lightning Network.
+Handle payment confirmations from the payments provider (Blink webhook, pull-verified against the API; NakaPay legacy).
 
 **Endpoint:** `POST /api/nakapay`
 
@@ -571,7 +556,7 @@ X-RateLimit-Reset: 1640995260
 5. **Automatic Confirmation**: Payment confirmed via webhook, pixels updated in real-time
 
 ### Payment Features
-- **Lightning Network**: Instant Bitcoin payments via NakaPay
+- **Lightning Network**: Instant Bitcoin payments via Blink (Galoy)
 - **QR Codes**: Easy wallet integration with scannable codes
 - **Invoice Display**: Copyable Lightning invoice text
 - **Real-time Status**: Live payment confirmation updates
@@ -580,7 +565,7 @@ X-RateLimit-Reset: 1640995260
 ## 🔒 Security
 
 - **Input Validation**: All user inputs are validated and sanitized
-- **Payment Security**: Lightning Network payment verification via NakaPay
+- **Payment Security**: Server-side pull-verification against the Blink API
 - **API Key Protection**: Server-side only API key handling
 - **Webhook Verification**: Payment confirmation signature validation
 - **WebSocket Security**: Connection limits and rate limiting
@@ -589,7 +574,7 @@ X-RateLimit-Reset: 1640995260
 ## ✅ Current Implementation Status
 
 ### MVP Features ✅ COMPLETED
-- **Payment Integration**: Full Lightning Network support with NakaPay
+- **Payment Integration**: Full Lightning Network support via Blink (Galoy)
 - **Real-time Updates**: WebSocket communication for live canvas updates
 - **Professional UI**: Polished payment modal with QR codes and error handling
 - **Mobile Responsive**: Works seamlessly on all device sizes
@@ -600,7 +585,7 @@ X-RateLimit-Reset: 1640995260
 ### Technology Stack
 - **Backend**: Node.js + Express + TypeScript + Socket.IO + SQLite
 - **Frontend**: Next.js + React 19 + TypeScript + Tailwind CSS + shadcn/ui
-- **Payments**: Lightning Network via NakaPay SDK
+- **Payments**: Lightning Network via Blink GraphQL API
 - **Real-time**: Socket.IO for WebSocket communication
 - **Testing**: Vitest for both backend and frontend
 - **Package Management**: pnpm workspaces for monorepo management
@@ -659,8 +644,8 @@ npm run migrate  # If migration script exists
 
 **Payment Integration Issues**
 ```bash
-# Test NakaPay API connection
-curl -X GET "https://api.nakapay.app/health"
+# Test Blink API connectivity (expect a GraphQL response, not an error)
+curl -s -X POST "https://api.blink.sv/graphql" -H "Content-Type: application/json" -d '{"query":"query Me { me { id } }"}'
 
 # Verify webhook endpoint
 curl -X POST http://localhost:3000/api/payments/webhook \
@@ -704,7 +689,7 @@ cat api/.env
 cat lnpixels-app/.env
 
 # Check environment variable loading
-cd api && node -e "console.log(process.env.NAKAPAY_API_KEY)"
+cd api && node -e "console.log(process.env.BLINK_API_KEY ? 'set' : 'MISSING')"
 ```
 
 ### Performance Issues
